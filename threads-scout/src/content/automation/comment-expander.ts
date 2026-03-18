@@ -61,9 +61,17 @@ async function navigateBack(feedUrl: string): Promise<void> {
   await sleep(1000)
 }
 
+/** 取得詳情頁中可見的貼文容器（過濾掉 SPA 背景中隱藏的 feed 元素） */
+function getVisibleContainers(): HTMLElement[] {
+  const all = document.querySelectorAll(SELECTORS.postContainer)
+  return Array.from(all).filter((el): el is HTMLElement =>
+    el instanceof HTMLElement && el.offsetHeight > 0
+  )
+}
+
 /** 從詳情頁抓取留言 */
 function scrapeRepliesFromDetailPage(): ThreadPost['replies'] {
-  const containers = document.querySelectorAll(SELECTORS.postContainer)
+  const containers = getVisibleContainers()
   const replies: ThreadPost['replies'] = []
 
   // 跳過第一個（主貼文），最多抓 10 則留言
@@ -100,11 +108,11 @@ function scrapeRepliesFromDetailPage(): ThreadPost['replies'] {
   return replies
 }
 
-/** 等待留言容器出現（postContainer > 1 表示有留言） */
+/** 等待留言容器出現（可見的 postContainer > 1 表示有留言） */
 async function waitForReplies(timeout: number): Promise<void> {
   const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
-    const count = document.querySelectorAll(SELECTORS.postContainer).length
+    const count = getVisibleContainers().length
     if (count > 1) return
     await sleep(300)
   }

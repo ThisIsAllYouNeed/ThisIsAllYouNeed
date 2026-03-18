@@ -1,7 +1,6 @@
 import type { ExtensionMessage } from '../shared/messages'
 import type { ScanProgress, ThreadPost, Recommendation, UserSettings } from '../shared/types'
 import { getSettings, getProductEmbedding, saveProductEmbedding } from '../shared/storage'
-import { LLM_BATCH_SIZE } from '../shared/constants'
 import { analyzePosts } from './openrouter-client'
 
 /** 掃描狀態 */
@@ -264,15 +263,10 @@ async function handlePostScraped(post: ThreadPost) {
   scanProgress.filtered++
   throttledBroadcastProgress()
   filteredPosts.push(post)
-
-  if (filteredPosts.length >= LLM_BATCH_SIZE) {
-    sendLog(`已累積 ${LLM_BATCH_SIZE} 篇相關貼文，送 LLM 分析...`)
-    await analyzeFilteredBatch()
-  }
 }
 
 async function handleScanComplete() {
-  sendLog('掃描完成，處理剩餘貼文...')
+  sendLog(`掃描完成，共 ${scanProgress.filtered} 篇相關貼文，送 LLM 分析...`)
   if (filteredPosts.length > 0) {
     await analyzeFilteredBatch()
   }
@@ -285,14 +279,15 @@ async function handleScanComplete() {
 async function analyzeFilteredBatch() {
   if (!currentSettings) return
 
-  const batch = filteredPosts.splice(0, LLM_BATCH_SIZE)
+  const batch = filteredPosts.splice(0)
+  if (batch.length === 0) return
+
   scanProgress.status = 'analyzing'
   broadcastProgress()
 
   try {
     const recommendations = await analyzePosts(batch, currentSettings)
     scanProgress.analyzed += batch.length
-    scanProgress.status = 'scanning'
     broadcastProgress()
     sendRecommendations(recommendations)
     sendLog(`LLM 回傳 ${recommendations.length} 則推薦`)
@@ -300,8 +295,6 @@ async function analyzeFilteredBatch() {
     const message = err instanceof Error ? err.message : '分析失敗'
     sendLog(`LLM 分析失敗: ${message}`)
     sendError(message)
-    scanProgress.status = 'scanning'
-    broadcastProgress()
   }
 }
 

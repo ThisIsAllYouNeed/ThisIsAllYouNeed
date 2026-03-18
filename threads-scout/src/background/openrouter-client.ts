@@ -79,7 +79,7 @@ ${postsContext}
     })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('OpenRouter API 回應逾時（60 秒），請稍後再試或換一個模型')
+      throw new Error(`OpenRouter API 回應逾時（${OPENROUTER_TIMEOUT_MS / 1000} 秒），請稍後再試或換一個模型`)
     }
     throw err
   } finally {

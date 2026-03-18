@@ -40,11 +40,8 @@ export const SCROLL_CONFIG = {
   waitForRepliesTimeout: 3000,
 }
 
-/** LLM 批次大小 */
-export const LLM_BATCH_SIZE = 5
-
 /** OpenRouter API 回應超時（毫秒） */
-export const OPENROUTER_TIMEOUT_MS = 60000
+export const OPENROUTER_TIMEOUT_MS = 120000
 
 /** 可選 LLM 模型 */
 export const AVAILABLE_MODELS = [
