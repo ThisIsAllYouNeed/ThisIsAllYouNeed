@@ -30,6 +30,8 @@ export const SCROLL_CONFIG = {
   longPauseMax: 15000,
   /** 留言展開 timeout（毫秒） */
   commentExpandTimeout: 5000,
+  /** fetchReplies 總超時（毫秒），防止永遠卡住 */
+  fetchRepliesTimeout: 20000,
 }
 
 /** LLM 批次大小 */

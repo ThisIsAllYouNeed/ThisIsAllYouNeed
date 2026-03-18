@@ -5,6 +5,12 @@ import { parsePostFromDOM } from './selectors/dom-fallback'
 import { SmartScroller } from './automation/scroller'
 import { fetchReplies } from './automation/comment-expander'
 import { SELECTORS } from './selectors/config'
+import { SCROLL_CONFIG } from '../shared/constants'
+
+/** 判斷是否在 feed 頁面（非貼文詳情頁） */
+function isOnFeedPage(): boolean {
+  return !window.location.pathname.includes('/post/')
+}
 
 // 清除前一個實例（scripting.executeScript 重複注入時）
 const win = window as unknown as { __threadsScoutDestroy?: () => void }
@@ -116,6 +122,9 @@ async function startScan(msg: StartScanMessage) {
       for (const entry of entries) {
         if (!entry.isIntersecting || !isScanning || isPaused) continue
 
+        // 在詳情頁時忽略所有 intersection 事件，避免把留言當成 feed 貼文
+        if (!isOnFeedPage()) continue
+
         if (isFetchingReplies) {
           // 導航期間暫存，稍後處理（僅保留仍在 DOM 中的 feed 元素）
           if (document.contains(entry.target)) {
@@ -150,16 +159,30 @@ async function processPost(element: HTMLElement) {
   const preview = post.textContent.slice(0, 40).replace(/\n/g, ' ')
   log(`[掃描] #${scannedCount} @${post.authorHandle}: ${preview}...`)
 
-  // 點進詳情頁抓取留言再返回
-  isFetchingReplies = true
-  scroller?.pause()
-  log(`[留言] 進入詳情頁 → ${post.url}`)
-  try {
-    post.replies = await fetchReplies(element)
-    log(`[留言] 返回 feed，抓到 ${post.replies.length} 則留言`)
-  } finally {
-    isFetchingReplies = false
-    scroller?.resume()
+  // 只在 feed 頁面才進入詳情頁抓取留言，避免嵌套導航
+  const onFeed = isOnFeedPage()
+  if (onFeed) {
+    isFetchingReplies = true
+    scroller?.pause()
+    log(`[留言] 進入詳情頁 → ${post.url}`)
+    let timerId: ReturnType<typeof setTimeout> | undefined
+    try {
+      const timeout = new Promise<ThreadPost['replies']>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('fetchReplies 超時')), SCROLL_CONFIG.fetchRepliesTimeout)
+      })
+      post.replies = await Promise.race([fetchReplies(element), timeout])
+      log(`[留言] 返回 feed，抓到 ${post.replies.length} 則留言`)
+    } catch (err) {
+      log(`[留言] 抓取失敗: ${err instanceof Error ? err.message : '未知錯誤'}`)
+      post.replies = []
+    } finally {
+      clearTimeout(timerId)
+      isFetchingReplies = false
+      scroller?.resume()
+    }
+  } else {
+    log(`[留言] 跳過留言抓取（不在 feed 頁面）`)
+    post.replies = []
   }
 
   safeSend({ type: 'POST_SCRAPED', post })
@@ -172,13 +195,18 @@ async function processPost(element: HTMLElement) {
   }
 
   // 處理在 fetchReplies 期間被跳過的元素（過濾掉已脫離 DOM 的詳情頁殘留）
-  const pending = pendingElements.splice(0)
-  if (pending.length > 0) {
-    const valid = pending.filter(el => document.contains(el))
-    log(`[佇列] ${pending.length} 個待處理元素，${valid.length} 個仍在 DOM`)
-    for (const el of valid) {
-      if (!isScanning) break
-      await processPost(el)
+  if (!isOnFeedPage()) {
+    // 不在 feed 頁面時清空佇列，這些元素來自詳情頁
+    pendingElements = []
+  } else {
+    const pending = pendingElements.splice(0)
+    if (pending.length > 0) {
+      const valid = pending.filter(el => document.contains(el))
+      log(`[佇列] ${pending.length} 個待處理元素，${valid.length} 個仍在 DOM`)
+      for (const el of valid) {
+        if (!isScanning || !isOnFeedPage()) break
+        await processPost(el)
+      }
     }
   }
 }
