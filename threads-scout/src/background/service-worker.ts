@@ -25,12 +25,14 @@ let contentPort: chrome.runtime.Port | null = null
 /** 目前使用者設定 */
 let currentSettings: UserSettings | null = null
 
+/** 遞增的請求 ID，用於匹配 offscreen 回應 */
+let nextRequestId = 0
+
 // === Port 連線管理 ===
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'sidepanel') {
     panelPort = port
-    // 送出目前狀態
     port.postMessage({ type: 'PROGRESS_UPDATE', progress: scanProgress })
     port.onMessage.addListener(handlePanelMessage)
     port.onDisconnect.addListener(() => { panelPort = null })
@@ -75,15 +77,35 @@ async function handleContentMessage(msg: ExtensionMessage) {
   }
 }
 
-// === 處理 Offscreen Document 的訊息 ===
+// === 通用的 offscreen 訊息-回應工具 ===
 
-chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
-  if (msg.type === 'EMBEDDING_READY' || msg.type === 'SIMILARITY_RESULT' || msg.type === 'MODEL_READY' || msg.type === 'MODEL_LOADING') {
-    // 這些訊息由各自的 Promise 回呼處理
-  }
-  sendResponse()
-  return false
-})
+/** 向 offscreen document 發送訊息並等待回應，附加 requestId 避免 race condition */
+function sendToOffscreen<T>(
+  message: Record<string, unknown>,
+  responseType: string,
+  extractResult: (msg: ExtensionMessage) => T,
+  timeoutMs = 30000,
+): Promise<T> {
+  const requestId = String(++nextRequestId)
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      chrome.runtime.onMessage.removeListener(handler)
+      reject(new Error(`Offscreen 回應逾時 (${responseType})`))
+    }, timeoutMs)
+
+    const handler = (msg: ExtensionMessage & { requestId?: string }) => {
+      if (msg.type === responseType && msg.requestId === requestId) {
+        clearTimeout(timer)
+        chrome.runtime.onMessage.removeListener(handler)
+        resolve(extractResult(msg))
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(handler)
+    chrome.runtime.sendMessage({ ...message, requestId })
+  })
+}
 
 // === 掃描控制 ===
 
@@ -100,7 +122,6 @@ async function startScan() {
     return
   }
 
-  // 重設狀態
   filteredPosts = []
   scanProgress = {
     status: 'scanning',
@@ -111,17 +132,14 @@ async function startScan() {
   }
   broadcastProgress()
 
-  // 確保 Offscreen Document 已建立
   await ensureOffscreenDocument()
 
-  // 計算產品 embedding（如果沒有快取）
   let productEmbedding = await getProductEmbedding()
   if (!productEmbedding) {
     productEmbedding = await computeEmbedding(currentSettings.productDescription)
     await saveProductEmbedding(productEmbedding)
   }
 
-  // 通知 Content Script 開始掃描
   contentPort?.postMessage({
     type: 'START_SCAN',
     targetCount: currentSettings.targetCount,
@@ -148,21 +166,31 @@ function stopScan() {
 
 // === 貼文處理 ===
 
+/** 節流用：上次廣播時間 */
+let lastBroadcastTime = 0
+const BROADCAST_THROTTLE_MS = 300
+
+function throttledBroadcastProgress() {
+  const now = Date.now()
+  if (now - lastBroadcastTime >= BROADCAST_THROTTLE_MS) {
+    lastBroadcastTime = now
+    broadcastProgress()
+  }
+}
+
 async function handlePostScraped(post: ThreadPost) {
   scanProgress.scanned++
-  broadcastProgress()
+  throttledBroadcastProgress()
 
   if (!currentSettings) return
 
-  // 計算 embedding 相似度
   const similarity = await computeSimilarity(post.textContent)
 
   if (similarity >= currentSettings.similarityThreshold) {
     scanProgress.filtered++
-    broadcastProgress()
+    throttledBroadcastProgress()
     filteredPosts.push(post)
 
-    // 達到批次大小時送 LLM 分析
     if (filteredPosts.length >= LLM_BATCH_SIZE) {
       await analyzeFilteredBatch()
     }
@@ -170,7 +198,6 @@ async function handlePostScraped(post: ThreadPost) {
 }
 
 async function handleScanComplete() {
-  // 處理剩餘貼文
   if (filteredPosts.length > 0) {
     await analyzeFilteredBatch()
   }
@@ -220,32 +247,25 @@ async function ensureOffscreenDocument() {
 async function computeEmbedding(text: string): Promise<number[]> {
   await ensureOffscreenDocument()
 
-  return new Promise((resolve) => {
-    const handler = (msg: ExtensionMessage) => {
-      if (msg.type === 'EMBEDDING_READY' && !msg.postId) {
-        chrome.runtime.onMessage.removeListener(handler)
-        resolve(msg.embedding)
-      }
-    }
-    chrome.runtime.onMessage.addListener(handler)
-    chrome.runtime.sendMessage({ type: 'COMPUTE_EMBEDDING', text })
-  })
+  return sendToOffscreen(
+    { type: 'COMPUTE_EMBEDDING', text },
+    'EMBEDDING_READY',
+    (msg) => (msg as ExtensionMessage & { embedding: number[] }).embedding,
+  )
 }
 
 /** 計算貼文與產品的 cosine similarity */
 async function computeSimilarity(text: string): Promise<number> {
   await ensureOffscreenDocument()
 
-  return new Promise((resolve) => {
-    const handler = (msg: ExtensionMessage) => {
-      if (msg.type === 'SIMILARITY_RESULT') {
-        chrome.runtime.onMessage.removeListener(handler)
-        resolve(msg.result.similarity)
-      }
-    }
-    chrome.runtime.onMessage.addListener(handler)
-    chrome.runtime.sendMessage({ type: 'COMPUTE_SIMILARITY', postId: 'temp', text })
-  })
+  return sendToOffscreen(
+    { type: 'COMPUTE_SIMILARITY', text },
+    'SIMILARITY_RESULT',
+    (msg) => {
+      if (msg.type === 'SIMILARITY_RESULT') return msg.result.similarity
+      return 0
+    },
+  )
 }
 
 // === 訊息廣播 ===

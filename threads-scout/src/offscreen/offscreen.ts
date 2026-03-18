@@ -1,6 +1,5 @@
 import { pipeline, type FeatureExtractionPipeline } from '@xenova/transformers'
 import { EMBEDDING_MODEL } from '../shared/constants'
-import type { ExtensionMessage } from '../shared/messages'
 
 let extractor: FeatureExtractionPipeline | null = null
 
@@ -28,7 +27,6 @@ async function loadModel(): Promise<FeatureExtractionPipeline> {
 /** 計算文字 embedding */
 async function computeEmbedding(text: string): Promise<number[]> {
   const model = await loadModel()
-  // multilingual-e5-small 建議加 "query: " 前綴
   const output = await model(`query: ${text}`, {
     pooling: 'mean',
     normalize: true,
@@ -49,17 +47,19 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
-// 監聽來自 Service Worker 的訊息
-chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendResponse) => {
+// 監聽來自 Service Worker 的訊息，回傳時附帶 requestId
+chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sendResponse) => {
+  const requestId = msg.requestId as string | undefined
+
   if (msg.type === 'COMPUTE_EMBEDDING') {
-    computeEmbedding(msg.text).then((embedding) => {
-      if (!msg.postId) {
-        // 這是產品 embedding
+    computeEmbedding(msg.text as string).then((embedding) => {
+      if (!requestId) {
+        // 沒有 requestId 視為產品 embedding
         productEmbedding = embedding
       }
       chrome.runtime.sendMessage({
         type: 'EMBEDDING_READY',
-        postId: msg.postId,
+        requestId,
         embedding,
       })
     })
@@ -68,17 +68,18 @@ chrome.runtime.onMessage.addListener((msg: ExtensionMessage, _sender, sendRespon
   }
 
   if (msg.type === 'COMPUTE_SIMILARITY') {
-    computeEmbedding(msg.text).then((postEmbedding) => {
+    computeEmbedding(msg.text as string).then((postEmbedding) => {
       const similarity = productEmbedding
         ? cosineSimilarity(productEmbedding, postEmbedding)
         : 0
 
       chrome.runtime.sendMessage({
         type: 'SIMILARITY_RESULT',
+        requestId,
         result: {
-          postId: msg.postId,
+          postId: msg.postId as string,
           similarity,
-          passed: similarity >= 0.3, // 閾值由 service worker 控制，這裡只回傳分數
+          passed: similarity >= 0.3,
         },
       })
     })
