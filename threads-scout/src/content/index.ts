@@ -113,8 +113,10 @@ async function startScan(msg: StartScanMessage) {
         if (!entry.isIntersecting || !isScanning || isPaused) continue
 
         if (isFetchingReplies) {
-          // 導航期間暫存，稍後處理
-          pendingElements.push(entry.target as HTMLElement)
+          // 導航期間暫存，稍後處理（僅保留仍在 DOM 中的 feed 元素）
+          if (document.contains(entry.target)) {
+            pendingElements.push(entry.target as HTMLElement)
+          }
           continue
         }
 
@@ -155,10 +157,11 @@ async function processPost(element: HTMLElement) {
     return
   }
 
-  // 處理在 fetchReplies 期間被跳過的元素
+  // 處理在 fetchReplies 期間被跳過的元素（過濾掉已脫離 DOM 的詳情頁殘留）
   const pending = pendingElements.splice(0)
   for (const el of pending) {
     if (!isScanning) break
+    if (!document.contains(el)) continue
     await processPost(el)
   }
 }

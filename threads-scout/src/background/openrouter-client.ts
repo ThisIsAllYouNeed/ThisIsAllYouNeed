@@ -1,5 +1,5 @@
 import type { ThreadPost, Recommendation, UserSettings } from '../shared/types'
-import { OPENROUTER_API_URL } from '../shared/constants'
+import { OPENROUTER_API_URL, OPENROUTER_TIMEOUT_MS } from '../shared/constants'
 
 /** 呼叫 OpenRouter API 分析貼文並產生推薦 */
 export async function analyzePosts(
@@ -53,24 +53,38 @@ ${postsContext}
 - 只推薦真正適合推廣的貼文，不相關的可以跳過
 - relevanceReason 用繁體中文說明`
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${settings.apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://thisisallyouneed.com',
-      'X-Title': 'Threads Scout',
-    },
-    body: JSON.stringify({
-      model: settings.llmModel,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    }),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${settings.apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://thisisallyouneed.com',
+        'X-Title': 'Threads Scout',
+      },
+      body: JSON.stringify({
+        model: settings.llmModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+      }),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('OpenRouter API 回應逾時（60 秒），請稍後再試或換一個模型')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!response.ok) {
     const err = await response.text()

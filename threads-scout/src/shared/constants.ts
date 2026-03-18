@@ -35,6 +35,9 @@ export const SCROLL_CONFIG = {
 /** LLM 批次大小 */
 export const LLM_BATCH_SIZE = 5
 
+/** OpenRouter API 回應超時（毫秒） */
+export const OPENROUTER_TIMEOUT_MS = 60000
+
 /** 可選 LLM 模型 */
 export const AVAILABLE_MODELS = [
   { id: 'openrouter/hunter-alpha', name: 'Hunter Alpha (免費)' },
