@@ -43,6 +43,10 @@ export const SCROLL_CONFIG = {
   postGapEstimate: 12,
   /** 最小滾動距離（像素） */
   minScrollDistance: 100,
+  /** IntersectionObserver 觀測區域：裁掉視窗底部的百分比（%），只在頂部區域偵測貼文 */
+  observerBottomCropPercent: 55,
+  /** IntersectionObserver 門檻：貼文在觀測區域中需可見的比例 */
+  observerThreshold: 0.3,
 }
 
 /** 興趣驅動行為設定檔 */

@@ -180,7 +180,10 @@ async function startScan(msg: StartScanMessage) {
         processPost(entry.target as HTMLElement)
       }
     },
-    { threshold: 0.5 },
+    {
+      threshold: SCROLL_CONFIG.observerThreshold,
+      rootMargin: `0px 0px -${SCROLL_CONFIG.observerBottomCropPercent}% 0px`,
+    },
   )
 
   observePosts(intersectionObserver)
