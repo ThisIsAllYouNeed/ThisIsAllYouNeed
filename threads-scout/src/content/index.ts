@@ -6,6 +6,14 @@ import { SmartScroller } from './automation/scroller'
 import { fetchReplies } from './automation/comment-expander'
 import { SELECTORS } from './selectors/config'
 
+// 清除前一個實例（scripting.executeScript 重複注入時）
+const win = window as unknown as { __threadsScoutDestroy?: () => void }
+win.__threadsScoutDestroy?.()
+
+/** 實例存活旗標，清除時設為 false 以停止自動重連 */
+let alive = true
+let retryCount = 0
+
 /** 已處理的貼文 ID */
 const processedPosts = new Set<string>()
 
@@ -32,12 +40,35 @@ let isFetchingReplies = false
 let pendingElements: HTMLElement[] = []
 
 function connectPort() {
-  port = chrome.runtime.connect({ name: 'content' })
-  port.onMessage.addListener(handleMessage)
-  port.onDisconnect.addListener(() => {
+  if (!alive || retryCount >= 5) return
+  try {
+    port = chrome.runtime.connect({ name: 'content' })
+    retryCount = 0
+    port.onMessage.addListener(handleMessage)
+    port.onDisconnect.addListener(() => {
+      port = null
+      scheduleReconnect()
+    })
+  } catch {
     port = null
-    isScanning = false
-  })
+    scheduleReconnect()
+  }
+}
+
+function scheduleReconnect() {
+  if (!alive || retryCount >= 5) return
+  const delay = Math.min(1000 * 2 ** retryCount, 30000)
+  retryCount++
+  setTimeout(connectPort, delay)
+}
+
+/** 安全發送訊息，斷線時不拋錯 */
+function safeSend(msg: Record<string, unknown>) {
+  try {
+    port?.postMessage(msg)
+  } catch {
+    port = null
+  }
 }
 
 function handleMessage(msg: ExtensionMessage) {
@@ -73,7 +104,7 @@ async function startScan(msg: StartScanMessage) {
 
   scroller = new SmartScroller()
   scroller.onWaitTime = (sec) => {
-    port?.postMessage({ type: 'WAIT_TIME', seconds: sec })
+    safeSend({ type: 'WAIT_TIME', seconds: sec })
   }
 
   intersectionObserver = new IntersectionObserver(
@@ -116,11 +147,11 @@ async function processPost(element: HTMLElement) {
     scroller?.resume()
   }
 
-  port?.postMessage({ type: 'POST_SCRAPED', post })
+  safeSend({ type: 'POST_SCRAPED', post })
 
   if (scannedCount >= targetCount) {
     stopScan()
-    port?.postMessage({ type: 'SCAN_COMPLETE', totalScraped: scannedCount })
+    safeSend({ type: 'SCAN_COMPLETE', totalScraped: scannedCount })
     return
   }
 
@@ -178,6 +209,14 @@ function observePosts(observer: IntersectionObserver) {
     childList: true,
     subtree: true,
   })
+}
+
+// 註冊清除函式供下次注入使用
+win.__threadsScoutDestroy = () => {
+  alive = false
+  stopScan()
+  port?.disconnect()
+  port = null
 }
 
 connectPort()

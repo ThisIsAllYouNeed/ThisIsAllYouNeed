@@ -10,45 +10,48 @@ const UI_NOISE = ['translate', 'like', 'reply', 'repost', 'share', 'more', 'foll
  * 回傳留言陣列，失敗時回傳空陣列
  */
 export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost['replies']> {
+  // 記錄 feed URL，確保能回來
+  const feedUrl = window.location.href
+  const scrollY = window.scrollY
+
   try {
-    // 找到貼文的 permalink 連結（時間戳連結）
     const permalink = postElement.querySelector(SELECTORS.permalink) as HTMLElement | null
     if (!permalink) return []
 
-    // 記錄目前滾動位置
-    const scrollY = window.scrollY
-
-    // 點擊進入詳情頁
     permalink.click()
 
-    // 等待 URL 變更（SPA 導航）
     const navigated = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout)
     if (!navigated) return []
 
-    // 等待留言載入
     await sleep(1500)
 
-    // 抓取留言（跳過第一個容器 = 主貼文）
     const replies = scrapeRepliesFromDetailPage()
 
-    // 返回 feed
-    history.back()
-    const returned = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout)
-    if (!returned) return []
+    // 返回 feed（最多重試一次）
+    await navigateBack(feedUrl)
     await sleep(500)
-
-    // 恢復滾動位置
     window.scrollTo(0, scrollY)
 
     return replies
   } catch {
-    // 確保回到 feed
-    if (window.location.pathname.includes('/post/')) {
-      history.back()
-      await sleep(1000)
-    }
+    // 任何錯誤都確保回到 feed
+    await navigateBack(feedUrl)
     return []
   }
+}
+
+/** 返回 feed 頁面，history.back() 失敗時直接跳轉 */
+async function navigateBack(feedUrl: string): Promise<void> {
+  if (!window.location.pathname.includes('/post/')) return
+
+  history.back()
+  const returned = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout)
+  if (returned) return
+
+  // history.back() 失敗，直接跳轉回 feed
+  window.location.href = feedUrl
+  await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout * 2)
+  await sleep(1000)
 }
 
 /** 從詳情頁抓取留言 */

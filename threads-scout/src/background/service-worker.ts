@@ -126,6 +126,15 @@ async function startScan() {
     return
   }
 
+  // 確保 content script 已連線
+  if (!contentPort) {
+    const connected = await ensureContentScript()
+    if (!connected) {
+      sendError('無法連線到 Threads 頁面。請確認你在 Threads 頁面上，並重新整理頁面（F5）後再試。')
+      return
+    }
+  }
+
   filteredPosts = []
   scanProgress = {
     status: 'scanning',
@@ -153,10 +162,46 @@ async function startScan() {
     )
   }
 
-  contentPort?.postMessage({
+  // contentPort 可能在 await 期間斷線，需再次檢查
+  if (!contentPort) {
+    sendError('Content script 連線中斷，請重新整理頁面後再試。')
+    scanProgress.status = 'idle'
+    broadcastProgress()
+    return
+  }
+
+  contentPort.postMessage({
     type: 'START_SCAN',
     targetCount: currentSettings.targetCount,
   })
+}
+
+/** 嘗試注入 content script 並等待連線 */
+async function ensureContentScript(): Promise<boolean> {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+  const tab = tabs[0]
+
+  if (!tab?.id || !tab.url?.match(/threads\.(net|com)/)) return false
+
+  try {
+    const scriptPath = chrome.runtime.getManifest().content_scripts?.[0]?.js?.[0]
+    if (!scriptPath) return false
+
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: [scriptPath],
+    })
+  } catch {
+    return false
+  }
+
+  // 等待 content script 連線（最多 3 秒）
+  for (let i = 0; i < 30; i++) {
+    if (contentPort) return true
+    await new Promise(r => setTimeout(r, 100))
+  }
+
+  return false
 }
 
 function pauseScan() {

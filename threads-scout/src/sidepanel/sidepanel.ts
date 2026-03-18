@@ -45,27 +45,64 @@ export class ThreadsScoutPanel extends LitElement {
   @state() private recommendations: Recommendation[] = []
   private port: chrome.runtime.Port | null = null
 
+  private alive = true
+  private retryCount = 0
+
   connectedCallback() {
     super.connectedCallback()
-    this.port = chrome.runtime.connect({ name: 'sidepanel' })
-    this.port.onMessage.addListener((msg: ExtensionMessage) => {
-      switch (msg.type) {
-        case 'PROGRESS_UPDATE':
-          this.progress = msg.progress
-          break
-        case 'RECOMMENDATION':
-          this.recommendations = [...this.recommendations, ...msg.recommendations]
-          break
-        case 'ERROR':
-          this.progress = { ...this.progress, status: 'error', error: msg.error }
-          break
-      }
-    })
+    this.alive = true
+    this.retryCount = 0
+    this.connectPort()
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
+    this.alive = false
     this.port?.disconnect()
+  }
+
+  private connectPort() {
+    if (!this.alive) return
+    try {
+      this.port = chrome.runtime.connect({ name: 'sidepanel' })
+      this.retryCount = 0
+      this.port.onMessage.addListener((msg: ExtensionMessage) => {
+        switch (msg.type) {
+          case 'PROGRESS_UPDATE':
+            this.progress = msg.progress
+            break
+          case 'RECOMMENDATION':
+            this.recommendations = [...this.recommendations, ...msg.recommendations]
+            break
+          case 'ERROR':
+            this.progress = { ...this.progress, status: 'error', error: msg.error }
+            break
+        }
+      })
+      this.port.onDisconnect.addListener(() => {
+        this.port = null
+        this.scheduleReconnect()
+      })
+    } catch {
+      this.port = null
+      this.scheduleReconnect()
+    }
+  }
+
+  private scheduleReconnect() {
+    if (!this.alive || this.retryCount >= 5) return
+    const delay = Math.min(1000 * 2 ** this.retryCount, 30000)
+    this.retryCount++
+    setTimeout(() => this.connectPort(), delay)
+  }
+
+  private sendMessage(msg: Record<string, unknown>) {
+    try {
+      this.port?.postMessage(msg)
+    } catch {
+      // Port 斷線，等待自動重連
+      this.port = null
+    }
   }
 
   private handleControl(e: CustomEvent<'start' | 'pause' | 'resume' | 'stop'>) {
@@ -76,7 +113,7 @@ export class ThreadsScoutPanel extends LitElement {
       resume: 'REQUEST_RESUME',
       stop: 'REQUEST_STOP',
     } as const
-    this.port?.postMessage({ type: msgMap[action] })
+    this.sendMessage({ type: msgMap[action] })
   }
 
   render() {
