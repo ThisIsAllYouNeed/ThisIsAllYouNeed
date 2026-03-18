@@ -5,6 +5,8 @@ import type { ExtensionMessage } from '../shared/messages'
 import './components/scan-control'
 import './components/progress-bar'
 import './components/result-card'
+import './components/activity-log'
+import type { ActivityLog } from './components/activity-log'
 
 @customElement('threads-scout-panel')
 export class ThreadsScoutPanel extends LitElement {
@@ -76,6 +78,10 @@ export class ThreadsScoutPanel extends LitElement {
             break
           case 'ERROR':
             this.progress = { ...this.progress, status: 'error', error: msg.error }
+            this.log(msg.error)
+            break
+          case 'LOG':
+            this.log(msg.text)
             break
         }
       })
@@ -105,6 +111,11 @@ export class ThreadsScoutPanel extends LitElement {
     }
   }
 
+  private log(text: string) {
+    const el = this.shadowRoot?.querySelector('activity-log') as ActivityLog | null
+    el?.addEntry(text)
+  }
+
   private handleControl(e: CustomEvent<'start' | 'pause' | 'resume' | 'stop'>) {
     const action = e.detail
     const msgMap = {
@@ -126,6 +137,8 @@ export class ThreadsScoutPanel extends LitElement {
       ></scan-control>
 
       <progress-bar .progress=${this.progress}></progress-bar>
+
+      <activity-log></activity-log>
 
       <div class="results">
         ${this.recommendations.length === 0 && this.progress.status === 'idle'

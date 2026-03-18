@@ -87,6 +87,11 @@ export interface ErrorMessage {
   error: string
 }
 
+export interface LogMessage {
+  type: 'LOG'
+  text: string
+}
+
 // === Side Panel → Service Worker ===
 
 export interface RequestStartMessage {
@@ -127,3 +132,4 @@ export type ExtensionMessage =
   | RequestPauseMessage
   | RequestResumeMessage
   | RequestStopMessage
+  | LogMessage

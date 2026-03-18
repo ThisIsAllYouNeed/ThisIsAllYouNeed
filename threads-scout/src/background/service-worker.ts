@@ -78,6 +78,10 @@ async function handleContentMessage(msg: ExtensionMessage) {
     case 'SCAN_COMPLETE':
       await handleScanComplete()
       break
+    case 'LOG':
+      // 轉發 content script 的 log 到 panel
+      panelPort?.postMessage(msg)
+      break
   }
 }
 
@@ -134,6 +138,8 @@ async function startScan() {
       return
     }
   }
+
+  sendLog('掃描開始')
 
   filteredPosts = []
   scanProgress = {
@@ -240,12 +246,19 @@ async function handlePostScraped(post: ThreadPost) {
   scanProgress.scanned++
   throttledBroadcastProgress()
 
+  const preview = post.textContent.slice(0, 40).replace(/\n/g, ' ')
+  sendLog(`收到貼文 #${scanProgress.scanned} @${post.authorHandle}: ${preview}...`)
+
   if (!currentSettings) return
 
   // 預過濾開啟時檢查相似度，關閉時所有貼文直接通過
   if (currentSettings.enablePrefilter) {
     const similarity = await computeSimilarity(post.textContent)
-    if (similarity < currentSettings.similarityThreshold) return
+    if (similarity < currentSettings.similarityThreshold) {
+      sendLog(`  ↳ 相似度 ${similarity.toFixed(2)} < ${currentSettings.similarityThreshold}，跳過`)
+      return
+    }
+    sendLog(`  ↳ 相似度 ${similarity.toFixed(2)} ✓ 通過過濾`)
   }
 
   scanProgress.filtered++
@@ -253,17 +266,20 @@ async function handlePostScraped(post: ThreadPost) {
   filteredPosts.push(post)
 
   if (filteredPosts.length >= LLM_BATCH_SIZE) {
+    sendLog(`已累積 ${LLM_BATCH_SIZE} 篇相關貼文，送 LLM 分析...`)
     await analyzeFilteredBatch()
   }
 }
 
 async function handleScanComplete() {
+  sendLog('掃描完成，處理剩餘貼文...')
   if (filteredPosts.length > 0) {
     await analyzeFilteredBatch()
   }
 
   scanProgress.status = 'done'
   broadcastProgress()
+  sendLog(`掃描結束: 共 ${scanProgress.scanned} 篇掃描, ${scanProgress.filtered} 篇相關, ${scanProgress.analyzed} 篇已分析`)
 }
 
 async function analyzeFilteredBatch() {
@@ -279,8 +295,10 @@ async function analyzeFilteredBatch() {
     scanProgress.status = 'scanning'
     broadcastProgress()
     sendRecommendations(recommendations)
+    sendLog(`LLM 回傳 ${recommendations.length} 則推薦`)
   } catch (err) {
     const message = err instanceof Error ? err.message : '分析失敗'
+    sendLog(`LLM 分析失敗: ${message}`)
     sendError(message)
     scanProgress.status = 'scanning'
     broadcastProgress()
@@ -346,4 +364,8 @@ function sendRecommendations(recommendations: Recommendation[]) {
 
 function sendError(error: string) {
   panelPort?.postMessage({ type: 'ERROR', error })
+}
+
+function sendLog(text: string) {
+  panelPort?.postMessage({ type: 'LOG', text })
 }

@@ -102,10 +102,14 @@ async function startScan(msg: StartScanMessage) {
   isFetchingReplies = false
   pendingElements = []
 
+  log('[啟動] 開始掃描，目標 ' + targetCount + ' 篇')
+
   scroller = new SmartScroller()
   scroller.onWaitTime = (sec) => {
     safeSend({ type: 'WAIT_TIME', seconds: sec })
+    log(`[滾動] 等待 ${sec}s...`)
   }
+  scroller.onLog = (text) => log(text)
 
   intersectionObserver = new IntersectionObserver(
     (entries) => {
@@ -130,6 +134,10 @@ async function startScan(msg: StartScanMessage) {
   scroller.start(targetCount)
 }
 
+function log(text: string) {
+  safeSend({ type: 'LOG', text })
+}
+
 async function processPost(element: HTMLElement) {
   if (!isScanning || isFetchingReplies) return
 
@@ -139,11 +147,16 @@ async function processPost(element: HTMLElement) {
   processedPosts.add(post.id)
   scannedCount++
 
+  const preview = post.textContent.slice(0, 40).replace(/\n/g, ' ')
+  log(`[掃描] #${scannedCount} @${post.authorHandle}: ${preview}...`)
+
   // 點進詳情頁抓取留言再返回
   isFetchingReplies = true
   scroller?.pause()
+  log(`[留言] 進入詳情頁 → ${post.url}`)
   try {
     post.replies = await fetchReplies(element)
+    log(`[留言] 返回 feed，抓到 ${post.replies.length} 則留言`)
   } finally {
     isFetchingReplies = false
     scroller?.resume()
@@ -152,6 +165,7 @@ async function processPost(element: HTMLElement) {
   safeSend({ type: 'POST_SCRAPED', post })
 
   if (scannedCount >= targetCount) {
+    log(`[完成] 已達目標 ${targetCount} 篇`)
     stopScan()
     safeSend({ type: 'SCAN_COMPLETE', totalScraped: scannedCount })
     return
@@ -159,10 +173,13 @@ async function processPost(element: HTMLElement) {
 
   // 處理在 fetchReplies 期間被跳過的元素（過濾掉已脫離 DOM 的詳情頁殘留）
   const pending = pendingElements.splice(0)
-  for (const el of pending) {
-    if (!isScanning) break
-    if (!document.contains(el)) continue
-    await processPost(el)
+  if (pending.length > 0) {
+    const valid = pending.filter(el => document.contains(el))
+    log(`[佇列] ${pending.length} 個待處理元素，${valid.length} 個仍在 DOM`)
+    for (const el of valid) {
+      if (!isScanning) break
+      await processPost(el)
+    }
   }
 }
 

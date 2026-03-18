@@ -30,7 +30,13 @@ export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost
     // 返回 feed（最多重試一次）
     await navigateBack(feedUrl)
     await sleep(500)
-    window.scrollTo(0, scrollY)
+
+    // Threads SPA 返回後可能需要時間重新渲染 feed 內容
+    // 先滾動到頂部附近讓 Threads 載入 feed，再慢慢回到原位
+    window.scrollTo(0, 0)
+    await sleep(300)
+    window.scrollTo(0, Math.min(scrollY, document.documentElement.scrollHeight - window.innerHeight))
+    await sleep(500)
 
     return replies
   } catch {
