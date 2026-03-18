@@ -36,6 +36,8 @@ export const SCROLL_CONFIG = {
   navigationWaitTimeout: 3000,
   /** 硬跳轉後等待頁面載入（毫秒） */
   hardNavigationWait: 3000,
+  /** 等待留言容器載入（毫秒） */
+  waitForRepliesTimeout: 3000,
 }
 
 /** LLM 批次大小 */

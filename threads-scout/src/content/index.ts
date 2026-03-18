@@ -217,10 +217,13 @@ async function processPost(element: HTMLElement) {
       post.replies = []
     } finally {
       clearTimeout(timerId)
-      isFetchingReplies = false
-      // 確認已回到 feed，否則導航回去
-      await ensureOnFeed()
-      scroller?.resume()
+      // 先確認回到 feed 再解除鎖定，避免 observer 在導航中處理元素
+      try {
+        await ensureOnFeed()
+      } finally {
+        isFetchingReplies = false
+        scroller?.resume()
+      }
     }
   } else {
     log(`[留言] 跳過留言抓取（不在 feed 頁面）`)

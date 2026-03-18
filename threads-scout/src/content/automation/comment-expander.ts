@@ -23,7 +23,8 @@ export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost
     const navigated = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout)
     if (!navigated) return []
 
-    await sleep(1500)
+    // 等待留言載入（輪詢 postContainer 數量 > 1）
+    await waitForReplies(SCROLL_CONFIG.waitForRepliesTimeout)
 
     const replies = scrapeRepliesFromDetailPage()
 
@@ -97,6 +98,16 @@ function scrapeRepliesFromDetailPage(): ThreadPost['replies'] {
   }
 
   return replies
+}
+
+/** 等待留言容器出現（postContainer > 1 表示有留言） */
+async function waitForReplies(timeout: number): Promise<void> {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    const count = document.querySelectorAll(SELECTORS.postContainer).length
+    if (count > 1) return
+    await sleep(300)
+  }
 }
 
 /** 等待 URL 變更 */
