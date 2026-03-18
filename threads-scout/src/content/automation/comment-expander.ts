@@ -23,10 +23,16 @@ export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost
     const navigated = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout)
     if (!navigated) return []
 
-    // 等待留言載入（輪詢 postContainer 數量 > 1）
-    await waitForReplies(SCROLL_CONFIG.waitForRepliesTimeout)
+    // 等待詳情頁 DOM 穩定（主貼文 + 留言都需要時間渲染）
+    await sleep(1000)
 
-    const replies = scrapeRepliesFromDetailPage()
+    // 計算主貼文 thread 佔幾個容器（開頭連續同作者的容器）
+    const mainThreadCount = countMainThread()
+
+    // 等待留言載入（可見容器數超過主 thread）
+    await waitForReplies(SCROLL_CONFIG.waitForRepliesTimeout, mainThreadCount)
+
+    const replies = scrapeRepliesFromDetailPage(mainThreadCount)
 
     // 返回 feed（最多重試一次）
     await navigateBack(feedUrl)
@@ -69,13 +75,35 @@ function getVisibleContainers(): HTMLElement[] {
   )
 }
 
-/** 從詳情頁抓取留言 */
-function scrapeRepliesFromDetailPage(): ThreadPost['replies'] {
+/**
+ * 計算主貼文 thread 佔幾個容器
+ * Threads 的多段貼文（thread）在詳情頁會佔多個 [data-pressable-container]，
+ * 全部由同一作者發出。留言區從第一個不同作者的容器開始。
+ * 使用 href 比較而非 textContent，因為頭像連結的 textContent 可能為空。
+ */
+function countMainThread(): number {
+  const containers = getVisibleContainers()
+  if (containers.length === 0) return 1
+
+  const mainAuthorHref = containers[0].querySelector(SELECTORS.authorHandle)?.getAttribute('href') ?? ''
+  if (!mainAuthorHref) return 1
+
+  let count = 0
+  for (const el of containers) {
+    const href = el.querySelector(SELECTORS.authorHandle)?.getAttribute('href') ?? ''
+    if (href !== mainAuthorHref) break
+    count++
+  }
+  return Math.max(1, count)
+}
+
+/** 從詳情頁抓取留言，skipCount 為主貼文佔的容器數 */
+function scrapeRepliesFromDetailPage(skipCount: number = 1): ThreadPost['replies'] {
   const containers = getVisibleContainers()
   const replies: ThreadPost['replies'] = []
 
-  // 跳過第一個（主貼文），最多抓 10 則留言
-  for (let i = 1; i < Math.min(11, containers.length); i++) {
+  // 跳過主貼文容器，只抓後面的留言（最多 10 則）
+  for (let i = skipCount; i < Math.min(skipCount + 10, containers.length); i++) {
     const el = containers[i]
     const author = el.querySelector(SELECTORS.authorHandle)?.textContent?.trim() ?? ''
 
@@ -108,12 +136,12 @@ function scrapeRepliesFromDetailPage(): ThreadPost['replies'] {
   return replies
 }
 
-/** 等待留言容器出現（可見的 postContainer > 1 表示有留言） */
-async function waitForReplies(timeout: number): Promise<void> {
+/** 等待留言容器出現（可見容器數超過主貼文的初始數量） */
+async function waitForReplies(timeout: number, initialCount: number): Promise<void> {
   const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
     const count = getVisibleContainers().length
-    if (count > 1) return
+    if (count > initialCount) return
     await sleep(300)
   }
 }
