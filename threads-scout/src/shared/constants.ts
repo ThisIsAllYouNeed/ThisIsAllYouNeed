@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   productName: '',
   productDescription: '',
   targetCount: 50,
+  enablePrefilter: true,
   similarityThreshold: 0.3,
   llmModel: 'openai/gpt-4o-mini',
 }

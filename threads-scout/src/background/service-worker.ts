@@ -132,20 +132,22 @@ async function startScan() {
   }
   broadcastProgress()
 
-  await ensureOffscreenDocument()
+  if (currentSettings.enablePrefilter) {
+    await ensureOffscreenDocument()
 
-  let productEmbedding = await getProductEmbedding()
-  if (!productEmbedding) {
-    productEmbedding = await computeEmbedding(currentSettings.productDescription)
-    await saveProductEmbedding(productEmbedding)
+    let productEmbedding = await getProductEmbedding()
+    if (!productEmbedding) {
+      productEmbedding = await computeEmbedding(currentSettings.productDescription)
+      await saveProductEmbedding(productEmbedding)
+    }
+
+    // 確保 offscreen 有產品 embedding（不管是新計算還是從 cache 載入）
+    await sendToOffscreen(
+      { type: 'SET_PRODUCT_EMBEDDING', embedding: productEmbedding },
+      'PRODUCT_EMBEDDING_SET',
+      () => {},
+    )
   }
-
-  // 確保 offscreen 有產品 embedding（不管是新計算還是從 cache 載入）
-  await sendToOffscreen(
-    { type: 'SET_PRODUCT_EMBEDDING', embedding: productEmbedding },
-    'PRODUCT_EMBEDDING_SET',
-    () => {},
-  )
 
   contentPort?.postMessage({
     type: 'START_SCAN',
@@ -191,16 +193,18 @@ async function handlePostScraped(post: ThreadPost) {
 
   if (!currentSettings) return
 
-  const similarity = await computeSimilarity(post.textContent)
+  // 預過濾開啟時檢查相似度，關閉時所有貼文直接通過
+  if (currentSettings.enablePrefilter) {
+    const similarity = await computeSimilarity(post.textContent)
+    if (similarity < currentSettings.similarityThreshold) return
+  }
 
-  if (similarity >= currentSettings.similarityThreshold) {
-    scanProgress.filtered++
-    throttledBroadcastProgress()
-    filteredPosts.push(post)
+  scanProgress.filtered++
+  throttledBroadcastProgress()
+  filteredPosts.push(post)
 
-    if (filteredPosts.length >= LLM_BATCH_SIZE) {
-      await analyzeFilteredBatch()
-    }
+  if (filteredPosts.length >= LLM_BATCH_SIZE) {
+    await analyzeFilteredBatch()
   }
 }
 
@@ -236,18 +240,24 @@ async function analyzeFilteredBatch() {
 
 // === Offscreen Document 管理 ===
 
+let offscreenReady = false
+
 async function ensureOffscreenDocument() {
+  if (offscreenReady) return
+
   const existingContexts = await chrome.runtime.getContexts({
     contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
   })
 
-  if (existingContexts.length > 0) return
+  if (existingContexts.length === 0) {
+    await chrome.offscreen.createDocument({
+      url: 'src/offscreen/offscreen.html',
+      reasons: [chrome.offscreen.Reason.WORKERS],
+      justification: '執行 Transformers.js embedding 模型推理',
+    })
+  }
 
-  await chrome.offscreen.createDocument({
-    url: 'src/offscreen/offscreen.html',
-    reasons: [chrome.offscreen.Reason.WORKERS],
-    justification: '執行 Transformers.js embedding 模型推理',
-  })
+  offscreenReady = true
 }
 
 /** 計算文字的 embedding */

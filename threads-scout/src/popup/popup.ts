@@ -82,6 +82,22 @@ export class ThreadsScoutPopup extends LitElement {
       text-align: right;
     }
 
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
+    .checkbox-row label {
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+
     button {
       width: 100%;
       padding: 10px;
@@ -216,21 +232,37 @@ export class ThreadsScoutPopup extends LitElement {
       </div>
 
       <div class="field">
-        <label>Embedding 相似度閾值</label>
-        <div class="slider-row">
+        <div class="checkbox-row">
           <input
-            type="range"
-            min="0.1"
-            max="0.8"
-            step="0.05"
-            .value=${String(this.settings.similarityThreshold)}
-            @input=${(e: Event) => {
-              this.settings = { ...this.settings, similarityThreshold: Number((e.target as HTMLInputElement).value) }
+            type="checkbox"
+            id="enablePrefilter"
+            .checked=${this.settings.enablePrefilter}
+            @change=${(e: Event) => {
+              this.settings = { ...this.settings, enablePrefilter: (e.target as HTMLInputElement).checked }
             }}
           />
-          <span class="slider-value">${this.settings.similarityThreshold.toFixed(2)}</span>
+          <label for="enablePrefilter">啟用 Embedding 預過濾</label>
         </div>
       </div>
+
+      ${this.settings.enablePrefilter ? html`
+        <div class="field">
+          <label>Embedding 相似度閾值</label>
+          <div class="slider-row">
+            <input
+              type="range"
+              min="0.1"
+              max="0.8"
+              step="0.05"
+              .value=${String(this.settings.similarityThreshold)}
+              @input=${(e: Event) => {
+                this.settings = { ...this.settings, similarityThreshold: Number((e.target as HTMLInputElement).value) }
+              }}
+            />
+            <span class="slider-value">${this.settings.similarityThreshold.toFixed(2)}</span>
+          </div>
+        </div>
+      ` : ''}
 
       <button @click=${this.handleSave}>儲存設定</button>
       <div class="saved ${this.saved ? 'show' : ''}">設定已儲存</div>

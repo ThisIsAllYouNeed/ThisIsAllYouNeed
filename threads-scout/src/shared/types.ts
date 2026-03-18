@@ -49,6 +49,7 @@ export interface UserSettings {
   productName: string
   productDescription: string
   targetCount: number
+  enablePrefilter: boolean
   similarityThreshold: number
   llmModel: string
 }
