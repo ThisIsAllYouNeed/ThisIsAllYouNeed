@@ -38,6 +38,8 @@ export const SCROLL_CONFIG = {
   hardNavigationWait: 3000,
   /** 等待留言容器載入（毫秒） */
   waitForRepliesTimeout: 3000,
+  /** 詳情頁 DOM 穩定等待（毫秒），讓主貼文 thread 完整渲染 */
+  detailPageSettleWait: 1000,
 }
 
 /** OpenRouter API 回應超時（毫秒） */

@@ -24,7 +24,7 @@ export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost
     if (!navigated) return []
 
     // 等待詳情頁 DOM 穩定（主貼文 + 留言都需要時間渲染）
-    await sleep(1000)
+    await sleep(SCROLL_CONFIG.detailPageSettleWait)
 
     // 計算主貼文 thread 佔幾個容器（開頭連續同作者的容器）
     const mainThreadCount = countMainThread()
@@ -94,7 +94,7 @@ function countMainThread(): number {
     if (href !== mainAuthorHref) break
     count++
   }
-  return Math.max(1, count)
+  return count
 }
 
 /** 從詳情頁抓取留言，skipCount 為主貼文佔的容器數 */
