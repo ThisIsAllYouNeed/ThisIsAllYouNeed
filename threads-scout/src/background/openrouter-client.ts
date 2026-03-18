@@ -7,7 +7,7 @@ export async function analyzePosts(
   settings: UserSettings,
 ): Promise<Recommendation[]> {
   const postsContext = posts.map((p, i) => {
-    const replies = p.replies.map(r => `  [留言 #${r.index}] ${r.author}: ${r.textContent}`).join('\n')
+    const replies = p.replies.map(r => `  [留言] @${r.authorHandle}: ${r.textContent}\n  連結: ${r.url}`).join('\n')
     return `--- 貼文 ${i + 1} ---
 連結: ${p.url}
 作者: ${p.author} (@${p.authorHandle})
@@ -41,7 +41,7 @@ ${postsContext}
   "recommendations": [
     {
       "postUrl": "貼文連結",
-      "targetComment": 0,
+      "targetUrl": "",
       "relevanceReason": "此貼文為何與產品相關",
       "suggestedReply": "建議的回覆內容"
     }
@@ -49,7 +49,7 @@ ${postsContext}
 }
 
 注意：
-- targetComment 為 0 表示回覆原始貼文，其他數字表示回覆對應編號的留言
+- targetUrl 為空字串表示回覆原始貼文，填入留言連結表示回覆該留言
 - 只推薦真正適合推廣的貼文，不相關的可以跳過
 - relevanceReason 用繁體中文說明`
 

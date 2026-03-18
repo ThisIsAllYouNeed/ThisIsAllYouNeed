@@ -7,20 +7,13 @@ export interface ThreadPost {
   textContent: string
   timestamp: string
   likes: number
-  replies: ThreadReply[]
-}
-
-/** 第一層留言 */
-export interface ThreadReply {
-  index: number
-  author: string
-  textContent: string
+  replies: ThreadPost[]
 }
 
 /** LLM 推薦結果 */
 export interface Recommendation {
   postUrl: string
-  targetComment: number
+  targetUrl: string
   relevanceReason: string
   suggestedReply: string
 }

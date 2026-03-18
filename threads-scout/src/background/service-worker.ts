@@ -27,6 +27,29 @@ let currentSettings: UserSettings | null = null
 /** 遞增的請求 ID，用於匹配 offscreen 回應 */
 let nextRequestId = 0
 
+// === Content Script 的 MAIN world 點擊請求 ===
+// ISOLATED world 的 .click() 無法觸發 Threads React SPA 導航，
+// 由 service worker 在 MAIN world 執行點擊
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'CLICK_PERMALINK' && sender.tab?.id) {
+    chrome.scripting.executeScript({
+      target: { tabId: sender.tab.id },
+      world: 'MAIN',
+      func: () => {
+        const el = document.querySelector('[data-tsc-click]') as HTMLElement | null
+        el?.click()
+        return !!el
+      },
+    }).then(results => {
+      sendResponse({ clicked: results?.[0]?.result ?? false })
+    }).catch(() => {
+      sendResponse({ clicked: false })
+    })
+    return true // 保持 message channel 開啟
+  }
+})
+
 // === Port 連線管理 ===
 
 chrome.runtime.onConnect.addListener((port) => {

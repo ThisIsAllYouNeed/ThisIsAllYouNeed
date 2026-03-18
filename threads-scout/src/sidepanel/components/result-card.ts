@@ -99,7 +99,8 @@ export class ResultCard extends LitElement {
   }
 
   private openPost() {
-    window.open(this.recommendation.postUrl, '_blank')
+    const url = this.recommendation.targetUrl || this.recommendation.postUrl
+    window.open(url, '_blank')
   }
 
   render() {
@@ -109,8 +110,8 @@ export class ResultCard extends LitElement {
       <div class="card">
         <a class="post-link" href=${r.postUrl} target="_blank">${r.postUrl}</a>
 
-        ${r.targetComment > 0 ? html`
-          <div class="target-comment">目標留言 #${r.targetComment}</div>
+        ${r.targetUrl ? html`
+          <a class="post-link target-comment" href=${r.targetUrl} target="_blank">回覆此留言</a>
         ` : ''}
 
         <div class="reason">${r.relevanceReason}</div>

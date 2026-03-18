@@ -1,9 +1,7 @@
 import { SCROLL_CONFIG } from '../../shared/constants'
 import type { ThreadPost } from '../../shared/types'
 import { SELECTORS } from '../selectors/config'
-
-/** 需要過濾的 UI 文字 */
-const UI_NOISE = ['translate', 'like', 'reply', 'repost', 'share', 'more', 'follow']
+import { parsePostFromDOM } from '../selectors/dom-fallback'
 
 /**
  * 點進貼文詳情頁抓取留言，再返回 feed
@@ -18,9 +16,19 @@ export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost
     const permalink = postElement.querySelector(SELECTORS.permalink) as HTMLElement | null
     if (!permalink) return []
 
-    permalink.click()
+    // ISOLATED world 的 .click() 無法觸發 Threads 的 React SPA 導航，
+    // 透過 service worker 在 MAIN world 執行點擊
+    permalink.setAttribute('data-tsc-click', '1')
+    try {
+      await chrome.runtime.sendMessage({ type: 'CLICK_PERMALINK' })
+    } catch {
+      return []
+    } finally {
+      permalink.removeAttribute('data-tsc-click')
+    }
 
-    const navigated = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout)
+    // 傳入 feedUrl 作為基準，因為 SPA 導航可能在 await sendMessage 期間已完成
+    const navigated = await waitForNavigation(SCROLL_CONFIG.commentExpandTimeout, feedUrl)
     if (!navigated) return []
 
     // 等待詳情頁 DOM 穩定（主貼文 + 留言都需要時間渲染）
@@ -98,39 +106,15 @@ function countMainThread(): number {
 }
 
 /** 從詳情頁抓取留言，skipCount 為主貼文佔的容器數 */
-function scrapeRepliesFromDetailPage(skipCount: number = 1): ThreadPost['replies'] {
+function scrapeRepliesFromDetailPage(skipCount: number = 1): ThreadPost[] {
   const containers = getVisibleContainers()
-  const replies: ThreadPost['replies'] = []
+  const replies: ThreadPost[] = []
 
   // 跳過主貼文容器，只抓後面的留言（最多 10 則）
   for (let i = skipCount; i < Math.min(skipCount + 10, containers.length); i++) {
-    const el = containers[i]
-    const author = el.querySelector(SELECTORS.authorHandle)?.textContent?.trim() ?? ''
-
-    // 取得所有 dir=auto 文字，過濾 UI 噪音
-    const textEls = Array.from(el.querySelectorAll(SELECTORS.textContent))
-    const texts = textEls
-      .map(t => t.textContent?.trim() ?? '')
-      .filter(t => {
-        if (t.length <= 3) return false
-        if (t === author) return false
-        const lower = t.toLowerCase()
-        if (UI_NOISE.some(noise => lower === noise || /^\d+$/.test(lower))) return false
-        return true
-      })
-
-    // 取最長的文字作為留言內容，並移除尾部的 UI 文字
-    const rawText = texts.reduce((a, b) => b.length > a.length ? b : a, '')
-    if (!rawText) continue
-
-    const cleanText = rawText
-      .replace(/\s*(Translate|翻譯)\s*$/i, '')
-      .replace(/\s*\d+\/\d+\s*$/, '')
-      .trim()
-
-    if (cleanText) {
-      replies.push({ index: i, author, textContent: cleanText })
-    }
+    const post = parsePostFromDOM(containers[i])
+    if (!post) continue
+    replies.push(post)
   }
 
   return replies
@@ -146,9 +130,11 @@ async function waitForReplies(timeout: number, initialCount: number): Promise<vo
   }
 }
 
-/** 等待 URL 變更 */
-function waitForNavigation(timeout: number): Promise<boolean> {
-  const startUrl = window.location.href
+/** 等待 URL 變更（可傳入 referenceUrl 避免 race condition） */
+async function waitForNavigation(timeout: number, referenceUrl?: string): Promise<boolean> {
+  const startUrl = referenceUrl ?? window.location.href
+  // URL 可能在呼叫前已變更（例如 MAIN world click 的 SPA 導航快於 message round-trip）
+  if (window.location.href !== startUrl) return true
   return new Promise((resolve) => {
     const interval = setInterval(() => {
       if (window.location.href !== startUrl) {

@@ -92,6 +92,12 @@ export interface LogMessage {
   text: string
 }
 
+// === Content Script → Service Worker（one-off message） ===
+
+export interface ClickPermalinkMessage {
+  type: 'CLICK_PERMALINK'
+}
+
 // === Side Panel → Service Worker ===
 
 export interface RequestStartMessage {
@@ -133,3 +139,4 @@ export type ExtensionMessage =
   | RequestResumeMessage
   | RequestStopMessage
   | LogMessage
+  | ClickPermalinkMessage
