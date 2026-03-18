@@ -136,8 +136,11 @@ async function startScan() {
 
   let productEmbedding = await getProductEmbedding()
   if (!productEmbedding) {
-    productEmbedding = await computeEmbedding(currentSettings.productDescription)
+    productEmbedding = await computeEmbedding(currentSettings.productDescription, true)
     await saveProductEmbedding(productEmbedding)
+  } else {
+    // 從 storage 載入的快取也需要送給 offscreen
+    chrome.runtime.sendMessage({ type: 'SET_PRODUCT_EMBEDDING', embedding: productEmbedding })
   }
 
   contentPort?.postMessage({
@@ -243,12 +246,12 @@ async function ensureOffscreenDocument() {
   })
 }
 
-/** 計算文字的 embedding */
-async function computeEmbedding(text: string): Promise<number[]> {
+/** 計算文字的 embedding，setAsProduct 為 true 時會在 offscreen 快取為產品 embedding */
+async function computeEmbedding(text: string, setAsProduct = false): Promise<number[]> {
   await ensureOffscreenDocument()
 
   return sendToOffscreen(
-    { type: 'COMPUTE_EMBEDDING', text },
+    { type: 'COMPUTE_EMBEDDING', text, setAsProduct },
     'EMBEDDING_READY',
     (msg) => (msg as ExtensionMessage & { embedding: number[] }).embedding,
   )

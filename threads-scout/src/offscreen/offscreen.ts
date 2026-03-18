@@ -47,42 +47,66 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
-// 監聽來自 Service Worker 的訊息，回傳時附帶 requestId
+// 監聯來自 Service Worker 的訊息，回傳時附帶 requestId
 chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sendResponse) => {
   const requestId = msg.requestId as string | undefined
 
+  if (msg.type === 'SET_PRODUCT_EMBEDDING') {
+    productEmbedding = msg.embedding as number[]
+    sendResponse()
+    return false
+  }
+
   if (msg.type === 'COMPUTE_EMBEDDING') {
-    computeEmbedding(msg.text as string).then((embedding) => {
-      if (!requestId) {
-        // 沒有 requestId 視為產品 embedding
-        productEmbedding = embedding
-      }
-      chrome.runtime.sendMessage({
-        type: 'EMBEDDING_READY',
-        requestId,
-        embedding,
+    computeEmbedding(msg.text as string)
+      .then((embedding) => {
+        if (msg.setAsProduct) {
+          productEmbedding = embedding
+        }
+        chrome.runtime.sendMessage({
+          type: 'EMBEDDING_READY',
+          requestId,
+          embedding,
+        })
       })
-    })
+      .catch((err) => {
+        chrome.runtime.sendMessage({
+          type: 'ERROR',
+          requestId,
+          error: err instanceof Error ? err.message : 'Embedding 計算失敗',
+        })
+      })
     sendResponse()
     return false
   }
 
   if (msg.type === 'COMPUTE_SIMILARITY') {
-    computeEmbedding(msg.text as string).then((postEmbedding) => {
-      const similarity = productEmbedding
-        ? cosineSimilarity(productEmbedding, postEmbedding)
-        : 0
-
+    if (!productEmbedding) {
       chrome.runtime.sendMessage({
         type: 'SIMILARITY_RESULT',
         requestId,
-        result: {
-          postId: msg.postId as string,
-          similarity,
-          passed: similarity >= 0.3,
-        },
+        result: { postId: msg.postId as string, similarity: 0 },
       })
-    })
+      sendResponse()
+      return false
+    }
+
+    computeEmbedding(msg.text as string)
+      .then((postEmbedding) => {
+        const similarity = cosineSimilarity(productEmbedding!, postEmbedding)
+        chrome.runtime.sendMessage({
+          type: 'SIMILARITY_RESULT',
+          requestId,
+          result: { postId: msg.postId as string, similarity },
+        })
+      })
+      .catch((err) => {
+        chrome.runtime.sendMessage({
+          type: 'ERROR',
+          requestId,
+          error: err instanceof Error ? err.message : '相似度計算失敗',
+        })
+      })
     sendResponse()
     return false
   }
