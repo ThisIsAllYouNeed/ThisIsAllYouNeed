@@ -32,6 +32,10 @@ export const SCROLL_CONFIG = {
   commentExpandTimeout: 5000,
   /** fetchReplies 總超時（毫秒），防止永遠卡住 */
   fetchRepliesTimeout: 20000,
+  /** history.back() 後等待頁面導航（毫秒） */
+  navigationWaitTimeout: 3000,
+  /** 硬跳轉後等待頁面載入（毫秒） */
+  hardNavigationWait: 3000,
 }
 
 /** LLM 批次大小 */

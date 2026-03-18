@@ -19,6 +19,8 @@ export class SmartScroller {
   private stuckCount = 0
   onWaitTime: ((seconds: number) => void) | null = null
   onLog: ((text: string) => void) | null = null
+  /** 當卡住時呼叫，讓呼叫者檢查頁面狀態並嘗試恢復。回傳 true 表示已處理。 */
+  onRecoverPage: (() => Promise<boolean>) | null = null
 
   constructor() {
     this.nextLongPause = this.randomInt(
@@ -175,6 +177,15 @@ export class SmartScroller {
    * 卡住恢復：先往上捲一小段觸發 Threads 載入更多內容，再等新內容出現
    */
   private async recoverFromStuck(): Promise<boolean> {
+    // 策略 0：讓呼叫者檢查頁面狀態（例如是否卡在詳情頁）
+    if (this.onRecoverPage) {
+      const recovered = await this.onRecoverPage()
+      if (recovered) {
+        this.stuckCount = 0
+        return true
+      }
+    }
+
     const heightBefore = document.documentElement.scrollHeight
     const scrollBefore = window.scrollY
 

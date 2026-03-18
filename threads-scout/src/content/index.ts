@@ -29,6 +29,9 @@ let isPaused = false
 let targetCount = 50
 let scannedCount = 0
 
+/** 掃描開始時的 feed URL，用於迷路時導航回去 */
+let feedUrl = ''
+
 /** Port 連線到 Service Worker */
 let port: chrome.runtime.Port | null = null
 
@@ -108,6 +111,7 @@ async function startScan(msg: StartScanMessage) {
   isFetchingReplies = false
   pendingElements = []
 
+  feedUrl = window.location.href
   log('[啟動] 開始掃描，目標 ' + targetCount + ' 篇')
 
   scroller = new SmartScroller()
@@ -116,6 +120,7 @@ async function startScan(msg: StartScanMessage) {
     log(`[滾動] 等待 ${sec}s...`)
   }
   scroller.onLog = (text) => log(text)
+  scroller.onRecoverPage = () => ensureOnFeed()
 
   intersectionObserver = new IntersectionObserver(
     (entries) => {
@@ -145,6 +150,41 @@ async function startScan(msg: StartScanMessage) {
 
 function log(text: string) {
   safeSend({ type: 'LOG', text })
+}
+
+/** 確認在 feed 頁面，否則導航回去。回傳 true 表示有執行導航。 */
+async function ensureOnFeed(): Promise<boolean> {
+  if (isOnFeedPage()) return false
+
+  log('[導航] 未回到 feed，嘗試 history.back()...')
+  history.back()
+
+  // 輪詢等待 URL 變回 feed（比固定 sleep 更快）
+  if (await waitUntilOnFeed(SCROLL_CONFIG.navigationWaitTimeout)) {
+    log('[導航] 已回到 feed')
+    return true
+  }
+
+  if (feedUrl) {
+    log(`[導航] history.back() 失敗，直接跳轉 ${feedUrl}`)
+    window.location.href = feedUrl
+    await sleep(SCROLL_CONFIG.hardNavigationWait)
+  }
+  return true
+}
+
+/** 輪詢等待回到 feed 頁面 */
+async function waitUntilOnFeed(timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (isOnFeedPage()) return true
+    await sleep(200)
+  }
+  return false
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms))
 }
 
 async function processPost(element: HTMLElement) {
@@ -178,6 +218,8 @@ async function processPost(element: HTMLElement) {
     } finally {
       clearTimeout(timerId)
       isFetchingReplies = false
+      // 確認已回到 feed，否則導航回去
+      await ensureOnFeed()
       scroller?.resume()
     }
   } else {
