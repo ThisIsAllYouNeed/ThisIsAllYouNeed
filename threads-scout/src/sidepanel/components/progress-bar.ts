@@ -68,18 +68,63 @@ export class ProgressBar extends LitElement {
     total: 50,
   }
 
+  private startTime: number | null = null
+  private elapsed = 0
+  private timerId: ReturnType<typeof setInterval> | null = null
+
+  updated(changed: Map<string, unknown>) {
+    if (changed.has('progress')) {
+      const status = this.progress.status
+      const isActive = status === 'scanning' || status === 'analyzing'
+
+      if (isActive && !this.timerId) {
+        this.startTime = Date.now()
+        this.elapsed = 0
+        this.timerId = setInterval(() => {
+          this.elapsed = Math.floor((Date.now() - this.startTime!) / 1000)
+          this.requestUpdate()
+        }, 1000)
+      } else if (!isActive && this.timerId) {
+        clearInterval(this.timerId)
+        this.timerId = null
+      }
+
+      if (status === 'idle') {
+        this.startTime = null
+        this.elapsed = 0
+      }
+    }
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    if (this.timerId) {
+      clearInterval(this.timerId)
+      this.timerId = null
+    }
+  }
+
+  private formatElapsed(): string {
+    const min = Math.floor(this.elapsed / 60)
+    const sec = this.elapsed % 60
+    return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${sec}s`
+  }
+
   private get percentage(): number {
     if (this.progress.total === 0) return 0
     return Math.round((this.progress.scanned / this.progress.total) * 100)
   }
 
   private get statusText(): string {
+    const time = this.elapsed > 0 ? ` (${this.formatElapsed()})` : ''
+    const wait = this.progress.currentWaitSec
+    const waitText = wait && this.progress.status === 'scanning' ? `，等待 ${wait}s` : ''
     const map: Record<string, string> = {
       idle: '等待開始',
-      scanning: '掃描中...',
-      paused: '已暫停',
-      analyzing: 'LLM 分析中...',
-      done: '完成',
+      scanning: `掃描中...${time}${waitText}`,
+      paused: `已暫停${time}`,
+      analyzing: `LLM 分析中...${time}`,
+      done: `完成${time}`,
       error: this.progress.error ?? '發生錯誤',
     }
     return map[this.progress.status] ?? ''

@@ -71,6 +71,10 @@ async function handleContentMessage(msg: ExtensionMessage) {
     case 'POST_SCRAPED':
       await handlePostScraped(msg.post)
       break
+    case 'WAIT_TIME':
+      scanProgress.currentWaitSec = msg.seconds
+      throttledBroadcastProgress()
+      break
     case 'SCAN_COMPLETE':
       await handleScanComplete()
       break

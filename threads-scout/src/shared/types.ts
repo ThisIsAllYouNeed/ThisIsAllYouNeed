@@ -41,6 +41,8 @@ export interface ScanProgress {
   analyzed: number
   total: number
   error?: string
+  /** 目前每篇貼文的等待秒數 */
+  currentWaitSec?: number
 }
 
 /** 使用者設定 */

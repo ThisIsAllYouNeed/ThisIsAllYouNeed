@@ -21,20 +21,11 @@ export const SELECTORS = {
   /** 按讚數 */
   likeCount: '[role="button"][aria-label*="like"], [role="button"][aria-label*="讚"]',
 
-  /** 展開留言按鈕 */
-  expandRepliesButton: '[role="button"]',
+  /** 貼文 permalink 連結 */
+  permalink: 'a[role="link"][href*="/post/"]',
 
-  /** 展開留言的文字匹配 */
-  expandRepliesText: ['查看回覆', 'replies', 'reply', '回覆'],
-
-  /** 留言容器 */
-  reply: '[data-pressable-container]',
-
-  /** 留言作者 */
-  replyAuthor: 'span[dir="auto"] > span',
-
-  /** 留言文字 */
-  replyText: '[dir="auto"]',
+  /** 文字內容 */
+  textContent: '[dir="auto"]',
 
   /** 貼文連結（內嵌 JSON 中的 data-sjs script） */
   dataScript: 'script[type="application/json"][data-sjs]',

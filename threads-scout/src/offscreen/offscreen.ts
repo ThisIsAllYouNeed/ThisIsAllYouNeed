@@ -1,5 +1,8 @@
-import { pipeline, type FeatureExtractionPipeline } from '@xenova/transformers'
+import { pipeline, env, type FeatureExtractionPipeline } from '@xenova/transformers'
 import { EMBEDDING_MODEL } from '../shared/constants'
+
+// MV3 CSP 禁止 blob URL worker，停用多執行緒以避免 importScripts 錯誤
+env.backends.onnx.wasm.numThreads = 1
 
 let extractor: FeatureExtractionPipeline | null = null
 

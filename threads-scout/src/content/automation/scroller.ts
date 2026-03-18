@@ -1,4 +1,5 @@
 import { SCROLL_CONFIG } from '../../shared/constants'
+import { SELECTORS } from '../selectors/config'
 
 /**
  * 智慧滾動引擎
@@ -10,6 +11,7 @@ export class SmartScroller {
   private postCount = 0
   private nextLongPause: number
   private rafId: number | null = null
+  onWaitTime: ((seconds: number) => void) | null = null
 
   constructor() {
     this.nextLongPause = this.randomInt(
@@ -32,6 +34,7 @@ export class SmartScroller {
 
       const postElement = this.getCurrentVisiblePost()
       const readTime = this.calculateReadTime(postElement)
+      this.onWaitTime?.(Math.round(readTime / 1000))
       await this.sleep(readTime)
 
       if (!this.running || this.paused) continue
@@ -46,6 +49,7 @@ export class SmartScroller {
           SCROLL_CONFIG.longPauseMin,
           SCROLL_CONFIG.longPauseMax,
         )
+        this.onWaitTime?.(Math.round(pauseTime / 1000))
         await this.sleep(pauseTime)
         this.nextLongPause = this.postCount + this.randomInt(
           SCROLL_CONFIG.longPauseEveryMin,
@@ -73,7 +77,7 @@ export class SmartScroller {
   }
 
   private getCurrentVisiblePost(): HTMLElement | null {
-    const posts = document.querySelectorAll('[data-pressable-container]')
+    const posts = document.querySelectorAll(SELECTORS.postContainer)
     const viewportCenter = window.innerHeight / 2
 
     for (const post of posts) {

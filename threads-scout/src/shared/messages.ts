@@ -12,6 +12,11 @@ export interface ScanCompleteMessage {
   totalScraped: number
 }
 
+export interface WaitTimeMessage {
+  type: 'WAIT_TIME'
+  seconds: number
+}
+
 // === Service Worker → Content Script ===
 
 export interface StartScanMessage {
@@ -104,6 +109,7 @@ export interface RequestStopMessage {
 export type ExtensionMessage =
   | PostScrapedMessage
   | ScanCompleteMessage
+  | WaitTimeMessage
   | StartScanMessage
   | PauseScanMessage
   | StopScanMessage
