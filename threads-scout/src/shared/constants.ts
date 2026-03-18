@@ -69,6 +69,26 @@ export const INTEREST_PROFILES = {
 
 export type InterestProfile = typeof INTEREST_PROFILES[keyof typeof INTEREST_PROFILES]
 
+/** 詳情頁瀏覽行為（模擬閱讀留言） */
+export const DETAIL_BROWSE_CONFIG = {
+  /** 瀏覽的 tick 次數範圍 */
+  tickCountMin: 2,
+  tickCountMax: 5,
+  /** 每 tick 停留時間（毫秒） */
+  tickPauseMin: 800,
+  tickPauseMax: 2000,
+  /** 每 tick 捲動量（視窗百分比） */
+  tickSizeMin: 0.08,
+  tickSizeMax: 0.2,
+  /** tick 往下的機率（其餘為小回捲） */
+  downwardProb: 0.8,
+  /** 回捲時的距離倍數 */
+  backscrollRatio: 0.3,
+  /** 離開前最後停留時間（毫秒） */
+  finalPauseMin: 500,
+  finalPauseMax: 1500,
+} as const
+
 export const REVISIT_CONFIG = {
   postsBeforeRevisitMin: 2,
   postsBeforeRevisitMax: 5,

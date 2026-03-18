@@ -1,4 +1,4 @@
-import { SCROLL_CONFIG } from '../../shared/constants'
+import { SCROLL_CONFIG, DETAIL_BROWSE_CONFIG } from '../../shared/constants'
 import type { ThreadPost } from '../../shared/types'
 import { SELECTORS } from '../selectors/config'
 import { parsePostFromDOM } from '../selectors/dom-fallback'
@@ -41,6 +41,9 @@ export async function fetchReplies(postElement: HTMLElement): Promise<ThreadPost
     await waitForReplies(SCROLL_CONFIG.waitForRepliesTimeout, mainThreadCount)
 
     const replies = scrapeRepliesFromDetailPage(mainThreadCount)
+
+    // 模擬閱讀留言：逐段捲動瀏覽
+    await browseDetailPage()
 
     // 返回 feed（最多重試一次）
     await navigateBack(feedUrl)
@@ -148,6 +151,36 @@ async function waitForNavigation(timeout: number, referenceUrl?: string): Promis
       resolve(window.location.href !== startUrl)
     }, timeout)
   })
+}
+
+/** 在詳情頁模擬閱讀：逐段往下捲動，偶爾回捲 */
+async function browseDetailPage(): Promise<void> {
+  const tickCount = randomInt(
+    DETAIL_BROWSE_CONFIG.tickCountMin,
+    DETAIL_BROWSE_CONFIG.tickCountMax,
+  )
+
+  for (let i = 0; i < tickCount; i++) {
+    const pause = randomInt(
+      DETAIL_BROWSE_CONFIG.tickPauseMin,
+      DETAIL_BROWSE_CONFIG.tickPauseMax,
+    )
+    await sleep(pause)
+
+    const tickSize = window.innerHeight * (
+      DETAIL_BROWSE_CONFIG.tickSizeMin +
+      Math.random() * (DETAIL_BROWSE_CONFIG.tickSizeMax - DETAIL_BROWSE_CONFIG.tickSizeMin)
+    )
+    const goDown = Math.random() < DETAIL_BROWSE_CONFIG.downwardProb
+    const distance = goDown ? tickSize : -tickSize * DETAIL_BROWSE_CONFIG.backscrollRatio
+    window.scrollBy(0, distance)
+  }
+
+  await sleep(randomInt(DETAIL_BROWSE_CONFIG.finalPauseMin, DETAIL_BROWSE_CONFIG.finalPauseMax))
+}
+
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
 function sleep(ms: number): Promise<void> {
