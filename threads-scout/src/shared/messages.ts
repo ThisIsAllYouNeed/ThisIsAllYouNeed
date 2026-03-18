@@ -22,6 +22,13 @@ export interface WaitTimeMessage {
 export interface StartScanMessage {
   type: 'START_SCAN'
   targetCount: number
+  similarityThreshold: number
+}
+
+export interface PostInterestMessage {
+  type: 'POST_INTEREST'
+  postUrl: string
+  score: number
 }
 
 export interface PauseScanMessage {
@@ -92,6 +99,14 @@ export interface LogMessage {
   text: string
 }
 
+// === Content Script → Service Worker（留言補送） ===
+
+export interface PostRepliesMessage {
+  type: 'POST_REPLIES'
+  postUrl: string
+  replies: ThreadPost[]
+}
+
 // === Content Script → Service Worker（one-off message） ===
 
 export interface ClickPermalinkMessage {
@@ -122,6 +137,7 @@ export type ExtensionMessage =
   | ScanCompleteMessage
   | WaitTimeMessage
   | StartScanMessage
+  | PostInterestMessage
   | PauseScanMessage
   | StopScanMessage
   | ResumeScanMessage
@@ -139,4 +155,5 @@ export type ExtensionMessage =
   | RequestResumeMessage
   | RequestStopMessage
   | LogMessage
+  | PostRepliesMessage
   | ClickPermalinkMessage

@@ -99,6 +99,14 @@ function handleMessage(msg: ExtensionMessage) {
   }
 }
 
+// 接收 POST_INTEREST（透過 chrome.tabs.sendMessage 而非 port）
+function handleInterestMessage(msg: ExtensionMessage) {
+  if (msg.type === 'POST_INTEREST') {
+    scroller?.notifyInterest(msg.postUrl, msg.score)
+  }
+}
+chrome.runtime.onMessage.addListener(handleInterestMessage)
+
 async function startScan(msg: StartScanMessage) {
   // 清除前次掃描的 observer
   stopScan()
@@ -121,6 +129,37 @@ async function startScan(msg: StartScanMessage) {
   }
   scroller.onLog = (text) => log(text)
   scroller.onRecoverPage = () => ensureOnFeed()
+
+  // 條件式留言抓取回呼
+  scroller.onRequestReplies = async (element: HTMLElement) => {
+    if (!isOnFeedPage()) return
+
+    const postUrl = (element.querySelector(SELECTORS.permalink) as HTMLAnchorElement | null)?.href ?? null
+    isFetchingReplies = true
+    scroller?.pause()
+    log(`[留言] 進入詳情頁 → ${postUrl ?? '未知'}`)
+    let timerId: ReturnType<typeof setTimeout> | undefined
+    try {
+      const timeout = new Promise<ThreadPost['replies']>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('fetchReplies 超時')), SCROLL_CONFIG.fetchRepliesTimeout)
+      })
+      const replies = await Promise.race([fetchReplies(element), timeout])
+      log(`[留言] 返回 feed，抓到 ${replies.length} 則留言`)
+      if (postUrl) {
+        safeSend({ type: 'POST_REPLIES', postUrl, replies })
+      }
+    } catch (err) {
+      log(`[留言] 抓取失敗: ${err instanceof Error ? err.message : '未知錯誤'}`)
+    } finally {
+      clearTimeout(timerId)
+      try {
+        await ensureOnFeed()
+      } finally {
+        isFetchingReplies = false
+        scroller?.resume()
+      }
+    }
+  }
 
   intersectionObserver = new IntersectionObserver(
     (entries) => {
@@ -145,7 +184,7 @@ async function startScan(msg: StartScanMessage) {
   )
 
   observePosts(intersectionObserver)
-  scroller.start(targetCount)
+  scroller.start(targetCount, msg.similarityThreshold)
 }
 
 function log(text: string) {
@@ -199,37 +238,8 @@ async function processPost(element: HTMLElement) {
   const preview = post.textContent.slice(0, 40).replace(/\n/g, ' ')
   log(`[掃描] #${scannedCount} @${post.authorHandle}: ${preview}...`)
 
-  // 只在 feed 頁面才進入詳情頁抓取留言，避免嵌套導航
-  const onFeed = isOnFeedPage()
-  if (onFeed) {
-    isFetchingReplies = true
-    scroller?.pause()
-    log(`[留言] 進入詳情頁 → ${post.url}`)
-    let timerId: ReturnType<typeof setTimeout> | undefined
-    try {
-      const timeout = new Promise<ThreadPost['replies']>((_, reject) => {
-        timerId = setTimeout(() => reject(new Error('fetchReplies 超時')), SCROLL_CONFIG.fetchRepliesTimeout)
-      })
-      post.replies = await Promise.race([fetchReplies(element), timeout])
-      log(`[留言] 返回 feed，抓到 ${post.replies.length} 則留言`)
-    } catch (err) {
-      log(`[留言] 抓取失敗: ${err instanceof Error ? err.message : '未知錯誤'}`)
-      post.replies = []
-    } finally {
-      clearTimeout(timerId)
-      // 先確認回到 feed 再解除鎖定，避免 observer 在導航中處理元素
-      try {
-        await ensureOnFeed()
-      } finally {
-        isFetchingReplies = false
-        scroller?.resume()
-      }
-    }
-  } else {
-    log(`[留言] 跳過留言抓取（不在 feed 頁面）`)
-    post.replies = []
-  }
-
+  // 留言由 scroller 透過 onRequestReplies 決定是否抓取
+  post.replies = []
   safeSend({ type: 'POST_SCRAPED', post })
 
   if (scannedCount >= targetCount) {
@@ -239,9 +249,8 @@ async function processPost(element: HTMLElement) {
     return
   }
 
-  // 處理在 fetchReplies 期間被跳過的元素（過濾掉已脫離 DOM 的詳情頁殘留）
+  // 處理在 fetchReplies 期間被跳過的元素
   if (!isOnFeedPage()) {
-    // 不在 feed 頁面時清空佇列，這些元素來自詳情頁
     pendingElements = []
   } else {
     const pending = pendingElements.splice(0)
@@ -308,6 +317,7 @@ function observePosts(observer: IntersectionObserver) {
 win.__threadsScoutDestroy = () => {
   alive = false
   stopScan()
+  chrome.runtime.onMessage.removeListener(handleInterestMessage)
   port?.disconnect()
   port = null
 }

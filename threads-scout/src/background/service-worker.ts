@@ -62,7 +62,8 @@ chrome.runtime.onConnect.addListener((port) => {
 
   if (port.name === 'content') {
     contentPort = port
-    port.onMessage.addListener(handleContentMessage)
+    const tabId = port.sender?.tab?.id ?? -1
+    port.onMessage.addListener((msg) => handleContentMessage(msg, tabId))
     port.onDisconnect.addListener(() => { contentPort = null })
   }
 })
@@ -88,10 +89,13 @@ async function handlePanelMessage(msg: ExtensionMessage) {
 
 // === 處理來自 Content Script 的訊息 ===
 
-async function handleContentMessage(msg: ExtensionMessage) {
+async function handleContentMessage(msg: ExtensionMessage, senderTabId: number) {
   switch (msg.type) {
     case 'POST_SCRAPED':
-      await handlePostScraped(msg.post)
+      await handlePostScraped(msg.post, senderTabId)
+      break
+    case 'POST_REPLIES':
+      handlePostReplies(msg.postUrl, msg.replies)
       break
     case 'WAIT_TIME':
       scanProgress.currentWaitSec = msg.seconds
@@ -201,6 +205,7 @@ async function startScan() {
   contentPort.postMessage({
     type: 'START_SCAN',
     targetCount: currentSettings.targetCount,
+    similarityThreshold: currentSettings.similarityThreshold,
   })
 }
 
@@ -264,7 +269,7 @@ function throttledBroadcastProgress() {
   }
 }
 
-async function handlePostScraped(post: ThreadPost) {
+async function handlePostScraped(post: ThreadPost, senderTabId: number) {
   scanProgress.scanned++
   throttledBroadcastProgress()
 
@@ -273,19 +278,38 @@ async function handlePostScraped(post: ThreadPost) {
 
   if (!currentSettings) return
 
-  // 預過濾開啟時檢查相似度，關閉時所有貼文直接通過
+  let score = 0
   if (currentSettings.enablePrefilter) {
-    const similarity = await computeSimilarity(post.textContent)
-    if (similarity < currentSettings.similarityThreshold) {
-      sendLog(`  ↳ 相似度 ${similarity.toFixed(2)} < ${currentSettings.similarityThreshold}，跳過`)
-      return
+    score = await computeSimilarity(post.textContent)
+    if (score >= currentSettings.similarityThreshold) {
+      scanProgress.filtered++
+      filteredPosts.push(post)
+      sendLog(`  ↳ 相似度 ${score.toFixed(2)} ✓ 通過過濾`)
+    } else {
+      sendLog(`  ↳ 相似度 ${score.toFixed(2)} < ${currentSettings.similarityThreshold}，跳過`)
     }
-    sendLog(`  ↳ 相似度 ${similarity.toFixed(2)} ✓ 通過過濾`)
+  } else {
+    filteredPosts.push(post)
   }
 
-  scanProgress.filtered++
   throttledBroadcastProgress()
-  filteredPosts.push(post)
+
+  // 回傳 interest score 給 content script
+  if (senderTabId >= 0) {
+    chrome.tabs.sendMessage(senderTabId, {
+      type: 'POST_INTEREST',
+      postUrl: post.url,
+      score,
+    })
+  }
+}
+
+function handlePostReplies(postUrl: string, replies: ThreadPost[]) {
+  const post = filteredPosts.find(p => p.url === postUrl)
+  if (post) {
+    post.replies = replies
+    sendLog(`[留言] 收到 ${replies.length} 則留言 → ${postUrl}`)
+  }
 }
 
 async function handleScanComplete() {

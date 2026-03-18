@@ -19,9 +19,6 @@ export const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions
 
 /** 滾動設定 */
 export const SCROLL_CONFIG = {
-  /** 中文閱讀速度（字/分鐘） */
-  readingSpeedMin: 300,
-  readingSpeedMax: 500,
   /** 長暫停間隔（每 N 篇） */
   longPauseEveryMin: 3,
   longPauseEveryMax: 7,
@@ -47,6 +44,39 @@ export const SCROLL_CONFIG = {
   /** 最小滾動距離（像素） */
   minScrollDistance: 100,
 }
+
+/** 興趣驅動行為設定檔 */
+export const INTEREST_PROFILES = {
+  high: {
+    tickPauseMin: 600,
+    tickPauseMax: 1500,
+    tickSizeMin: 0.04,
+    tickSizeMax: 0.08,
+    downwardProb: 0.75,
+    enterRepliesProb: 0.6,
+    markForRevisit: true,
+  },
+  low: {
+    tickPauseMin: 150,
+    tickPauseMax: 400,
+    tickSizeMin: 0.06,
+    tickSizeMax: 0.12,
+    downwardProb: 0.95,
+    enterRepliesProb: 0,
+    markForRevisit: false,
+  },
+} as const
+
+export type InterestProfile = typeof INTEREST_PROFILES[keyof typeof INTEREST_PROFILES]
+
+export const REVISIT_CONFIG = {
+  postsBeforeRevisitMin: 2,
+  postsBeforeRevisitMax: 5,
+  revisitPauseMin: 3000,
+  revisitPauseMax: 5000,
+  revisitProb: 0.7,
+  maxQueueSize: 10,
+} as const
 
 /** OpenRouter API 回應超時（毫秒） */
 export const OPENROUTER_TIMEOUT_MS = 120000
