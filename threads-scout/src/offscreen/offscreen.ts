@@ -47,12 +47,13 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
-// 監聯來自 Service Worker 的訊息，回傳時附帶 requestId
+// 監聽來自 Service Worker 的訊息，回傳時附帶 requestId
 chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sendResponse) => {
   const requestId = msg.requestId as string | undefined
 
   if (msg.type === 'SET_PRODUCT_EMBEDDING') {
     productEmbedding = msg.embedding as number[]
+    chrome.runtime.sendMessage({ type: 'PRODUCT_EMBEDDING_SET', requestId })
     sendResponse()
     return false
   }
@@ -60,9 +61,6 @@ chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sen
   if (msg.type === 'COMPUTE_EMBEDDING') {
     computeEmbedding(msg.text as string)
       .then((embedding) => {
-        if (msg.setAsProduct) {
-          productEmbedding = embedding
-        }
         chrome.runtime.sendMessage({
           type: 'EMBEDDING_READY',
           requestId,
