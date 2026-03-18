@@ -27,10 +27,10 @@ async function loadModel(): Promise<FeatureExtractionPipeline> {
   return extractor
 }
 
-/** 計算文字 embedding */
-async function computeEmbedding(text: string): Promise<number[]> {
+/** 計算文字 embedding，E5 模型需區分 query（搜尋側）與 passage（文件側） */
+async function computeEmbedding(text: string, prefix: 'query' | 'passage'): Promise<number[]> {
   const model = await loadModel()
-  const output = await model(`query: ${text}`, {
+  const output = await model(`${prefix}: ${text}`, {
     pooling: 'mean',
     normalize: true,
   })
@@ -62,7 +62,7 @@ chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sen
   }
 
   if (msg.type === 'COMPUTE_EMBEDDING') {
-    computeEmbedding(msg.text as string)
+    computeEmbedding(msg.text as string, 'query')
       .then((embedding) => {
         chrome.runtime.sendMessage({
           type: 'EMBEDDING_READY',
@@ -92,7 +92,7 @@ chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sen
       return false
     }
 
-    computeEmbedding(msg.text as string)
+    computeEmbedding(msg.text as string, 'passage')
       .then((postEmbedding) => {
         const similarity = cosineSimilarity(productEmbedding!, postEmbedding)
         chrome.runtime.sendMessage({
