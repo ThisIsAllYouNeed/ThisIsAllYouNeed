@@ -107,16 +107,29 @@ export class SmartScroller {
 
   private getCurrentVisiblePost(): HTMLElement | null {
     const posts = document.querySelectorAll(SELECTORS.postContainer)
-    const viewportCenter = window.innerHeight / 2
+    const targetY = window.innerHeight * SCROLL_CONFIG.scrollTargetRatio
+
+    let closest: HTMLElement | null = null
+    let closestDist = Infinity
 
     for (const post of posts) {
       const rect = post.getBoundingClientRect()
-      if (rect.top < viewportCenter && rect.bottom > viewportCenter) {
+
+      // 優先：跨越目標位置的貼文
+      if (rect.top <= targetY && rect.bottom > targetY) {
         return post as HTMLElement
       }
-    }
 
-    return null
+      // 備選：視窗內離目標最近的貼文
+      if (rect.top >= 0 && rect.top < window.innerHeight) {
+        const dist = Math.abs(rect.top - targetY)
+        if (dist < closestDist) {
+          closestDist = dist
+          closest = post as HTMLElement
+        }
+      }
+    }
+    return closest
   }
 
   private calculateReadTime(element: HTMLElement | null): number {
@@ -135,10 +148,17 @@ export class SmartScroller {
   }
 
   private calculateScrollDistance(element: HTMLElement | null): number {
+    const targetY = window.innerHeight * SCROLL_CONFIG.scrollTargetRatio
+
     if (!element) return window.innerHeight * 0.7
 
     const rect = element.getBoundingClientRect()
-    return rect.height + this.randomInt(20, 60)
+    const gap = SCROLL_CONFIG.postGapEstimate + this.randomInt(0, 20)
+
+    // 將下一篇貼文的頂部（≈ 當前貼文 bottom + gap）滾到目標位置
+    const distance = rect.bottom - targetY + gap
+    const maxScroll = window.innerHeight * (1 - SCROLL_CONFIG.scrollTargetRatio)
+    return Math.max(SCROLL_CONFIG.minScrollDistance, Math.min(maxScroll, distance))
   }
 
   private smoothScroll(distance: number): Promise<void> {

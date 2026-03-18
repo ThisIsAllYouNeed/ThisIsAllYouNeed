@@ -40,6 +40,12 @@ export const SCROLL_CONFIG = {
   waitForRepliesTimeout: 3000,
   /** 詳情頁 DOM 穩定等待（毫秒），讓主貼文 thread 完整渲染 */
   detailPageSettleWait: 1000,
+  /** 目標閱讀位置（視窗高度比例），0.15 表示從頂部往下 15% */
+  scrollTargetRatio: 0.15,
+  /** 貼文間距估計（像素） */
+  postGapEstimate: 12,
+  /** 最小滾動距離（像素） */
+  minScrollDistance: 100,
 }
 
 /** OpenRouter API 回應超時（毫秒） */
