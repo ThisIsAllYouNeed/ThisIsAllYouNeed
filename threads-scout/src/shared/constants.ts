@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   targetCount: 50,
   enablePrefilter: true,
   similarityThreshold: 0.3,
-  llmModel: 'openai/gpt-4o-mini',
+  llmModel: 'openrouter/hunter-alpha',
 }
 
 /** Embedding 模型 ID */
@@ -37,6 +37,8 @@ export const LLM_BATCH_SIZE = 5
 
 /** 可選 LLM 模型 */
 export const AVAILABLE_MODELS = [
+  { id: 'openrouter/hunter-alpha', name: 'Hunter Alpha (免費)' },
+  { id: 'openrouter/free', name: '免費模型路由 (隨機)' },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
   { id: 'openai/gpt-4o', name: 'GPT-4o' },
   { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
