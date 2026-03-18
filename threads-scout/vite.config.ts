@@ -1,22 +1,19 @@
 import { defineConfig } from 'vite'
-import { crx } from '@crxjs/vite-plugin'
+import webExtension from 'vite-plugin-web-extension'
 import { resolve } from 'path'
-import manifest from './manifest.json'
 
 export default defineConfig({
   plugins: [
-    crx({ manifest }),
+    webExtension({
+      manifest: 'manifest.json',
+      additionalInputs: [
+        'src/offscreen/offscreen.html',
+      ],
+    }),
   ],
   resolve: {
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),
-    },
-  },
-  build: {
-    rollupOptions: {
-      input: {
-        offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
-      },
     },
   },
 })
