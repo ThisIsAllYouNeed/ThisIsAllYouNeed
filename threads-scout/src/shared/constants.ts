@@ -7,12 +7,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
   productDescription: '',
   targetCount: 50,
   enablePrefilter: true,
-  similarityThreshold: 0.3,
+  similarityThreshold: 0.7,
   llmModel: 'openrouter/hunter-alpha',
 }
 
-/** Embedding 模型 ID */
-export const EMBEDDING_MODEL = 'Xenova/multilingual-e5-small'
+/** Embedding 模型設定（BGE-small-zh-v1.5：24MB、MIT 授權、中文專用、分數分佈 [0.4-1.0]） */
+export const EMBEDDING_MODEL = 'Xenova/bge-small-zh-v1.5'
+export const EMBEDDING_POOLING = 'cls' as const
 
 /** OpenRouter API 端點 */
 export const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'

@@ -1,5 +1,5 @@
 import { pipeline, env, type FeatureExtractionPipeline } from '@xenova/transformers'
-import { EMBEDDING_MODEL } from '../shared/constants'
+import { EMBEDDING_MODEL, EMBEDDING_POOLING } from '../shared/constants'
 
 // MV3 CSP 禁止 blob URL worker，停用多執行緒以避免 importScripts 錯誤
 env.backends.onnx.wasm.numThreads = 1
@@ -27,11 +27,11 @@ async function loadModel(): Promise<FeatureExtractionPipeline> {
   return extractor
 }
 
-/** 計算文字 embedding，E5 模型需區分 query（搜尋側）與 passage（文件側） */
-async function computeEmbedding(text: string, prefix: 'query' | 'passage'): Promise<number[]> {
+/** 計算文字 embedding（BGE-small-zh-v1.5 使用 CLS pooling，不需要前綴） */
+async function computeEmbedding(text: string): Promise<number[]> {
   const model = await loadModel()
-  const output = await model(`${prefix}: ${text}`, {
-    pooling: 'mean',
+  const output = await model(text, {
+    pooling: EMBEDDING_POOLING,
     normalize: true,
   })
   return Array.from(output.data as Float32Array)
@@ -62,7 +62,7 @@ chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sen
   }
 
   if (msg.type === 'COMPUTE_EMBEDDING') {
-    computeEmbedding(msg.text as string, 'query')
+    computeEmbedding(msg.text as string)
       .then((embedding) => {
         chrome.runtime.sendMessage({
           type: 'EMBEDDING_READY',
@@ -92,7 +92,7 @@ chrome.runtime.onMessage.addListener((msg: Record<string, unknown>, _sender, sen
       return false
     }
 
-    computeEmbedding(msg.text as string, 'passage')
+    computeEmbedding(msg.text as string)
       .then((postEmbedding) => {
         const similarity = cosineSimilarity(productEmbedding!, postEmbedding)
         chrome.runtime.sendMessage({

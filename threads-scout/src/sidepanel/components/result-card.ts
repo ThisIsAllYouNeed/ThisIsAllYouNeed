@@ -10,82 +10,109 @@ export class ResultCard extends LitElement {
     }
 
     .card {
-      background: white;
-      border: 1px solid #e8e8e8;
-      border-radius: 8px;
-      padding: 12px;
+      background: var(--c-bg, #ffffff);
+      border: 1px solid var(--c-border, #e2e8f0);
+      border-left: 3px solid var(--c-primary, #6366f1);
+      border-radius: var(--radius-sm, 6px);
+      padding: 14px;
+      transition: box-shadow 0.2s;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
     }
 
     .post-link {
       font-size: 12px;
-      color: #0a7cff;
+      color: var(--c-primary, #6366f1);
       text-decoration: none;
       word-break: break-all;
+      font-weight: 500;
     }
 
     .post-link:hover {
       text-decoration: underline;
     }
 
+    .target-link {
+      display: inline-block;
+      font-size: 11px;
+      color: var(--c-text-tertiary, #94a3b8);
+      text-decoration: none;
+      margin-top: 4px;
+    }
+
+    .target-link:hover {
+      color: var(--c-primary, #6366f1);
+      text-decoration: underline;
+    }
+
     .reason {
       font-size: 13px;
-      color: #333;
-      margin: 8px 0;
-      line-height: 1.5;
+      color: var(--c-text-secondary, #64748b);
+      margin: 10px 0;
+      line-height: 1.6;
     }
 
     .reply-section {
-      background: #f8f8f8;
-      border-radius: 6px;
-      padding: 10px;
-      margin-top: 8px;
+      background: var(--c-surface, #f8fafc);
+      border-radius: var(--radius-sm, 6px);
+      padding: 12px;
+      margin-top: 10px;
     }
 
     .reply-label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
-      color: #999;
-      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--c-text-tertiary, #94a3b8);
+      margin-bottom: 6px;
     }
 
     .reply-text {
       font-size: 13px;
-      color: #1a1a1a;
-      line-height: 1.5;
+      color: var(--c-text, #0f172a);
+      line-height: 1.6;
       white-space: pre-wrap;
     }
 
     .actions {
       display: flex;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 10px;
     }
 
-    button {
-      padding: 6px 12px;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      background: white;
+    .action-btn {
+      padding: 6px 14px;
+      border: 1px solid var(--c-border, #e2e8f0);
+      border-radius: var(--radius-sm, 6px);
+      background: var(--c-bg, #ffffff);
       font-size: 12px;
+      font-weight: 500;
+      color: var(--c-text-secondary, #64748b);
       cursor: pointer;
-      transition: background 0.2s;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
     }
 
-    button:hover {
-      background: #f0f0f0;
+    .action-btn:hover {
+      border-color: var(--c-primary, #6366f1);
+      color: var(--c-primary, #6366f1);
+      background: var(--c-primary-soft, rgba(99, 102, 241, 0.08));
+    }
+
+    .action-btn:active {
+      transform: scale(0.97);
     }
 
     .copied {
-      color: #00b341;
+      color: var(--c-success, #10b981);
       font-size: 12px;
+      font-weight: 500;
       display: flex;
       align-items: center;
-    }
-
-    .target-comment {
-      font-size: 11px;
-      color: #999;
-      margin-top: 4px;
+      gap: 4px;
+      padding: 6px 14px;
     }
   `
 
@@ -111,7 +138,7 @@ export class ResultCard extends LitElement {
         <a class="post-link" href=${r.postUrl} target="_blank">${r.postUrl}</a>
 
         ${r.targetUrl ? html`
-          <a class="post-link target-comment" href=${r.targetUrl} target="_blank">回覆此留言</a>
+          <a class="target-link" href=${r.targetUrl} target="_blank">↳ 回覆此留言</a>
         ` : ''}
 
         <div class="reason">${r.relevanceReason}</div>
@@ -123,9 +150,9 @@ export class ResultCard extends LitElement {
 
         <div class="actions">
           ${this.copied
-            ? html`<span class="copied">已複製</span>`
-            : html`<button @click=${this.copyReply}>複製回覆</button>`}
-          <button @click=${this.openPost}>前往貼文</button>
+            ? html`<span class="copied">✓ 已複製</span>`
+            : html`<button class="action-btn" @click=${this.copyReply}>複製回覆</button>`}
+          <button class="action-btn" @click=${this.openPost}>前往貼文</button>
         </div>
       </div>
     `

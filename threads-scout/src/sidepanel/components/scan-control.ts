@@ -19,52 +19,59 @@ export class ScanControl extends LitElement {
       flex: 1;
       padding: 10px;
       border: none;
-      border-radius: 6px;
+      border-radius: var(--radius-sm, 6px);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s, opacity 0.2s;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+
+    button:active {
+      transform: scale(0.97);
     }
 
     button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
 
     .start {
-      background: #0a7cff;
-      color: white;
+      background: var(--c-primary, #6366f1);
+      color: var(--c-primary-text, #ffffff);
+      box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
     }
 
     .start:hover:not(:disabled) {
-      background: #0066dd;
+      background: var(--c-primary-hover, #4f46e5);
+      box-shadow: var(--shadow-md);
     }
 
     .pause {
-      background: #ff9500;
-      color: white;
+      background: var(--c-warning-soft, rgba(245, 158, 11, 0.1));
+      color: var(--c-warning, #f59e0b);
     }
 
     .pause:hover:not(:disabled) {
-      background: #e68600;
+      background: rgba(245, 158, 11, 0.18);
     }
 
     .stop {
-      background: #ff3b30;
-      color: white;
+      background: var(--c-error-soft, rgba(239, 68, 68, 0.1));
+      color: var(--c-error, #ef4444);
     }
 
     .stop:hover:not(:disabled) {
-      background: #e6352b;
+      background: rgba(239, 68, 68, 0.18);
     }
 
     .resume {
-      background: #00b341;
-      color: white;
+      background: var(--c-success-soft, rgba(16, 185, 129, 0.1));
+      color: var(--c-success, #10b981);
     }
 
     .resume:hover:not(:disabled) {
-      background: #009936;
+      background: rgba(16, 185, 129, 0.18);
     }
   `
 

@@ -1,5 +1,5 @@
 import type { UserSettings } from './types'
-import { DEFAULT_SETTINGS } from './constants'
+import { DEFAULT_SETTINGS, EMBEDDING_MODEL } from './constants'
 
 const SETTINGS_KEY = 'threads_scout_settings'
 const PRODUCT_EMBEDDING_KEY = 'threads_scout_product_embedding'
@@ -18,15 +18,29 @@ export async function saveSettings(settings: Partial<UserSettings>): Promise<voi
   })
 }
 
-/** 讀取產品 embedding 快取 */
-export async function getProductEmbedding(): Promise<number[] | null> {
-  const result = await chrome.storage.local.get(PRODUCT_EMBEDDING_KEY)
-  return result[PRODUCT_EMBEDDING_KEY] ?? null
+interface CachedEmbedding {
+  model: string
+  embedding: number[]
 }
 
-/** 儲存產品 embedding 快取 */
+function isCachedEmbedding(value: unknown): value is CachedEmbedding {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const obj = value as Record<string, unknown>
+  return typeof obj.model === 'string' && Array.isArray(obj.embedding)
+}
+
+/** 讀取產品 embedding 快取（模型不符時自動失效） */
+export async function getProductEmbedding(): Promise<number[] | null> {
+  const result = await chrome.storage.local.get(PRODUCT_EMBEDDING_KEY)
+  const cached = result[PRODUCT_EMBEDDING_KEY] as unknown
+  if (!isCachedEmbedding(cached) || cached.model !== EMBEDDING_MODEL) return null
+  return cached.embedding
+}
+
+/** 儲存產品 embedding 快取（含模型 ID 供版本驗證） */
 export async function saveProductEmbedding(embedding: number[]): Promise<void> {
-  await chrome.storage.local.set({ [PRODUCT_EMBEDDING_KEY]: embedding })
+  const entry: CachedEmbedding = { model: EMBEDDING_MODEL, embedding }
+  await chrome.storage.local.set({ [PRODUCT_EMBEDDING_KEY]: entry })
 }
 
 /** 清除產品 embedding 快取 */

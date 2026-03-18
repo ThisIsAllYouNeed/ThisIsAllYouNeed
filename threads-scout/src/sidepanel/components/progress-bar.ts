@@ -9,54 +9,66 @@ export class ProgressBar extends LitElement {
       display: block;
     }
 
-    .progress-container {
-      background: #f0f0f0;
+    .progress-track {
+      background: var(--c-surface, #f8fafc);
       border-radius: 4px;
       height: 6px;
       overflow: hidden;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
     .progress-fill {
       height: 100%;
-      background: #0a7cff;
+      background: linear-gradient(90deg, var(--c-primary, #6366f1), var(--c-primary-light, #a78bfa));
       border-radius: 4px;
-      transition: width 0.3s ease;
+      transition: width 0.4s ease;
     }
 
     .stats {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: #666;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
     }
 
     .stat {
       display: flex;
       flex-direction: column;
       align-items: center;
+      padding: 10px 4px;
+      background: var(--c-surface, #f8fafc);
+      border-radius: var(--radius-sm, 6px);
     }
 
     .stat-value {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 700;
-      color: #1a1a1a;
+      color: var(--c-text, #0f172a);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
     }
 
     .stat-label {
-      font-size: 11px;
-      color: #999;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--c-text-tertiary, #94a3b8);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
 
     .status {
       text-align: center;
       font-size: 12px;
-      margin-top: 8px;
-      color: #666;
+      color: var(--c-text-secondary, #64748b);
+      padding: 4px 0;
     }
 
     .status.error {
-      color: #ff3b30;
+      color: var(--c-error, #ef4444);
+      background: var(--c-error-soft, rgba(239, 68, 68, 0.1));
+      border-radius: var(--radius-sm, 6px);
+      padding: 6px 10px;
     }
   `
 
@@ -134,18 +146,18 @@ export class ProgressBar extends LitElement {
     const { scanned, filtered, analyzed, total } = this.progress
 
     return html`
-      <div class="progress-container">
+      <div class="progress-track">
         <div class="progress-fill" style="width: ${this.percentage}%"></div>
       </div>
 
       <div class="stats">
         <div class="stat">
           <span class="stat-value">${scanned}</span>
-          <span class="stat-label">已掃描 / ${total}</span>
+          <span class="stat-label">掃描 / ${total}</span>
         </div>
         <div class="stat">
           <span class="stat-value">${filtered}</span>
-          <span class="stat-label">相關貼文</span>
+          <span class="stat-label">相關</span>
         </div>
         <div class="stat">
           <span class="stat-value">${analyzed}</span>

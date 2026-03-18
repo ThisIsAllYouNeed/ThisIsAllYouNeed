@@ -16,23 +16,59 @@ export class ThreadsScoutPanel extends LitElement {
       padding: 16px;
     }
 
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm, 6px);
+      background: linear-gradient(135deg, var(--c-primary, #6366f1), var(--c-primary-light, #a78bfa));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
     h1 {
       font-size: 16px;
-      margin-bottom: 12px;
+      font-weight: 700;
+      color: var(--c-text, #0f172a);
+      letter-spacing: -0.01em;
+    }
+
+    .results-header {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--c-text-tertiary, #94a3b8);
+      margin-top: 16px;
+      margin-bottom: 10px;
     }
 
     .results {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      margin-top: 12px;
+      gap: 10px;
     }
 
     .empty {
       text-align: center;
-      color: #999;
-      padding: 32px 16px;
+      color: var(--c-text-tertiary, #94a3b8);
+      padding: 40px 20px;
       font-size: 13px;
+      line-height: 1.6;
+      background: var(--c-surface, #f8fafc);
+      border-radius: var(--radius-md, 10px);
+      border: 1px dashed var(--c-border, #e2e8f0);
     }
   `
 
@@ -129,7 +165,10 @@ export class ThreadsScoutPanel extends LitElement {
 
   render() {
     return html`
-      <h1>Threads Scout</h1>
+      <div class="header">
+        <div class="logo">TS</div>
+        <h1>Threads Scout</h1>
+      </div>
 
       <scan-control
         .status=${this.progress.status}
@@ -140,9 +179,13 @@ export class ThreadsScoutPanel extends LitElement {
 
       <activity-log></activity-log>
 
+      ${this.recommendations.length > 0 ? html`
+        <div class="results-header">推薦結果 (${this.recommendations.length})</div>
+      ` : ''}
+
       <div class="results">
         ${this.recommendations.length === 0 && this.progress.status === 'idle'
-          ? html`<div class="empty">設定完成後，點擊「開始掃描」來探索 Threads 推廣機會</div>`
+          ? html`<div class="empty">設定完成後，點擊「開始掃描」<br/>來探索 Threads 推廣機會</div>`
           : this.recommendations.map(
               r => html`<result-card .recommendation=${r}></result-card>`
             )}

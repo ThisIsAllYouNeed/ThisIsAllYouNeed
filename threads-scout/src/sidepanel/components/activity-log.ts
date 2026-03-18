@@ -20,44 +20,68 @@ export class ActivityLog extends LitElement {
       align-items: center;
       cursor: pointer;
       user-select: none;
-      padding: 6px 0;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm, 6px);
+      transition: background 0.15s;
+    }
+
+    .header:hover {
+      background: var(--c-surface-hover, #f1f5f9);
     }
 
     .title {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--c-text-tertiary, #94a3b8);
     }
 
     .toggle {
       font-size: 10px;
-      color: #999;
+      color: var(--c-text-tertiary, #94a3b8);
     }
 
     .log-container {
       max-height: 200px;
       overflow-y: auto;
-      background: #f8f8f8;
-      border-radius: 6px;
-      padding: 8px;
-      font-family: monospace;
+      background: var(--c-surface, #f8fafc);
+      border: 1px solid var(--c-border, #e2e8f0);
+      border-radius: var(--radius-sm, 6px);
+      padding: 10px;
+      margin-top: 4px;
+      font-family: var(--font-mono, monospace);
       font-size: 11px;
-      line-height: 1.6;
+      line-height: 1.7;
+    }
+
+    .log-container::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .log-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .log-container::-webkit-scrollbar-thumb {
+      background: var(--c-border, #e2e8f0);
+      border-radius: 2px;
     }
 
     .entry {
-      color: #333;
+      color: var(--c-text-secondary, #64748b);
       word-break: break-all;
     }
 
     .time {
-      color: #999;
-      margin-right: 4px;
+      color: var(--c-text-tertiary, #94a3b8);
+      margin-right: 6px;
     }
 
     .empty {
-      color: #999;
+      color: var(--c-text-tertiary, #94a3b8);
       font-style: italic;
+      font-family: var(--font-sans, sans-serif);
     }
   `
 
@@ -85,7 +109,7 @@ export class ActivityLog extends LitElement {
     return html`
       <div class="header" @click=${() => { this.collapsed = !this.collapsed }}>
         <span class="title">活動記錄 (${this.entries.length})</span>
-        <span class="toggle">${this.collapsed ? '展開 ▼' : '收合 ▲'}</span>
+        <span class="toggle">${this.collapsed ? '▼ 展開' : '▲ 收合'}</span>
       </div>
       ${this.collapsed ? '' : html`
         <div class="log-container">
