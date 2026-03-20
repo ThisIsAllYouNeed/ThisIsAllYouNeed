@@ -8,6 +8,7 @@ export default defineConfig({
       manifest: 'manifest.json',
       additionalInputs: [
         'src/offscreen/offscreen.html',
+        'src/options/index.html',
       ],
     }),
   ],
